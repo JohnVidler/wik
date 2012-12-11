@@ -1,0 +1,653 @@
+#!/usr/bin/env ruby
+
+require 'webrick'
+require 'ostruct'
+require 'optparse'
+require 'logger'
+require 'base64'
+require 'markdown'
+require 'mime/types'
+require 'erb'
+
+
+HEAD_TEMPLATE = %q{
+<html>
+  <head>
+    <title><%= title %> -- Wik</title>
+    <style type="text/css">
+      div#banner{
+        width: 100%;
+        border-bottom: solid 2px #333;
+        background-color: #eee;
+      }
+
+      div#banner h1{
+        font-size: 1em;
+        margin: 0.1em;
+        padding: 0.1em;
+        line-height: 1em;
+      }
+
+      div#menu{
+        padding: 0 0.2em;
+      }
+
+      div#menu{
+        text-align: right;
+        float: right;
+      }
+
+      div#menu a{
+        font-size: smaller;
+        text-decoration: none;
+        color: blue;
+      }
+
+      /* ------------ Main content styling ---------------- */
+      a{
+      }
+      a:hover{
+          -webkit-transition: all .2s;
+          -moz-transition: all .2s;
+          color: red;
+      }
+      a img:hover{
+          -webkit-transition: all .2s;
+          -moz-transition: all .2s;
+          box-shadow: 0 0 10px #333;
+      }
+
+      h3,h4,h5{
+          padding-left: 0.5em;
+      }
+
+      p,dl,ul,pre{
+          margin-left: 1.5em;
+          /*width: 40em;*/
+      }
+
+      form{
+          margin-left: 1.5em;
+      }
+
+      h4{
+          width: 80%;
+          border-bottom: solid 1px #aaa;
+          font-family: Georgia, serif;
+      }
+
+      h3{
+          font-size: 1.2em;
+          clear: both;
+          border-bottom: solid 1px #333;
+          font-family: Georgia, serif;
+          /*border-left: solid 5px #333;*/
+      }
+
+      h3.noclear{
+          clear: none;
+      }
+
+      h3.short{
+          width: 80%;
+      }
+
+      img{
+          margin: 1em;
+          border: solid 1px #333;
+      }
+
+      strong{
+          letter-spacing: -1px;
+      }
+
+      strong a{
+          text-decoration: none;
+      }
+
+      /* 
+       * Right-aligned images.
+       *
+       * This is a fallback rule for browsers that do not
+       * support the media selectors below.
+       */
+      img.rightimg{
+          float: right;
+          clear: right;
+          max-width: 98%;
+      }
+      /* For images below 600px, set them to be full-width,
+       * with the same margins as default, and inline with
+       * the text.
+       */
+      @media (min-width: 0px){
+          img.rightimg{
+              float: none;
+              display: block;
+              position: static;
+              clear: none;
+              margin: 1em auto;
+          }
+      }
+      /* Above 600px set them to float to the right, as in
+       * the fallback rule.
+       */
+      @media (min-width: 600px){
+          img.rightimg{
+              /* Undo previous selector */
+              margin: 1em;
+              position: float;
+              /* Apply new style */
+              
+              float: right;
+              clear: right;
+          }
+      }
+
+
+      img.centreimg{
+          margin: 0 auto;
+      }
+
+      div.clear{
+          clear: both;
+      }
+
+      div.centre{
+          margin: 1em 0;
+          width: 100%;
+          text-align: center;
+      }
+
+      div.centre img{
+          margin: 0 auto;
+      }
+
+      .noborder{
+          border: none;
+      }
+
+      pre{
+          border: solid 1px #333;
+          width: 90%;
+          padding: 1em;
+          background-color: rgba(222,222,222,0.4);
+          overflow-x: auto;
+          /*background: #eee;*/
+      }
+
+      pre:hover{
+          background-color: white; 
+          -webkit-transition: all .25s;
+          -moz-transition: all .25s;
+      }
+
+      blockquote, pre.quote{
+          /*border: solid 1px #333;*/
+          width: 90%;
+          padding: 0.25em 1em;
+          /*background: #eee;*/
+          box-shadow: 1px 1px 4px #333;
+      }
+
+
+      code{
+          border: solid 1px transparent;
+          margin: 0 0.1em;
+          padding: 0 0.1em;
+      }
+
+      code:hover{
+          border: solid 1px #333;
+          box-shadow: 0px 0px 4px #333;
+          -webkit-transition: all .25s;
+          -moz-transition: all .25s;
+      }
+
+      dt{ 
+        font-weight: bold; 
+        margin-top: 0.1em;
+        padding: 0;
+        letter-spacing: -1px;
+        line-height: 0.9em;
+      }
+      dd{ 
+        margin-bottom: .5em; 
+        padding: 0;
+      }
+
+
+
+      .superscript{
+          vertical-align: super;
+      }
+
+      .subscript{
+          vertical-align: sub;
+      }
+
+      .superscript, .subscript{
+          font-size: 70%;
+      }
+
+
+      /* ------------ Tables ---------------- */
+      table{
+          border-bottom: solid 2px #333;
+          border-collapse: collapse;
+          margin-left: 1.5em;
+          background: white; /* for primitive browsers */
+          background: rgba(255,255,255,0.7);
+      }
+
+      table.noshift{
+          margin-left: 0;
+      }
+
+      table.monospace{
+          font-family: monospace;
+      }
+
+      thead tr, tfoot tr{
+          font-weight: bold;
+          /*font-size: 120%;*/
+      }
+
+      thead tr th, tfoot tr td{
+          border-top: solid 2px #333;
+          border-bottom: solid 2px #333;
+          padding: 0.2em;
+      }
+
+      table tr td{
+          padding: 0.15em 0.8em;
+      }
+
+      td.alright{
+          text-align: right;
+      }
+
+      td.alcentre{
+          text-align: center;
+      }
+
+      td.alleft{
+          text-align: left;
+      }
+    </style>
+
+    <style type="text/css" media="print">
+      /* StephenWattam.com print CSS */
+
+      div#banner{
+          display: none;
+      }
+
+      a{
+          color: black;
+          text-decoration: none;
+          border-bottom: dotted 1px blue;
+      }
+
+      /* Display URL behind links */
+      /*a:link:after, a:visited:after {
+          content: "[" attr(href) "]";
+          font-size: 50%;
+          text-decoration: none;
+          font-family: monospace;
+      }*/
+
+      h2{
+          text-align: center;
+          text-decoration: none;
+          font-size: 24pt;
+      }
+
+
+      body{
+          background: white;
+          font-size: 10pt;
+
+          font-family: Georgia, Palatino, 'Palatino Linotype', Times, 'Times New Roman', serif;
+          line-height: 15pt;
+      }
+
+      h3{
+          page-break-after: avoid;
+          font-family: sans-serif;
+      }
+
+      h4{
+          font-family: sans-serif;
+      }
+
+      acronym{
+          text-decoration: none;
+          border-bottom: none;
+      }
+
+      code{
+          border: solid 1px #ddd;
+      }
+
+
+      pre, .boxycode{
+          overflow: auto;
+          page-break-inside: avoid;
+          orphans: 5;
+          widows: 5;
+          font-size: 80%;
+      }
+    </style>
+
+  </head>
+  <body>
+    <div id="banner">
+      <div id="menu">
+        <% if basedir != @basedir %>
+        <a href="../">[&larr;]</a>
+        <% end %>
+        <%= dirs.map{|c|
+          c = "<a href='#{c}#{File.directory?(File.join(path, c)) ? '/' : ''}'/>#{c}</a>"
+        }.join(", ") %>
+      </div>
+      <h1><%= title %></h1>
+    </div>
+}
+
+FOOT_TEMPLATE = %{
+  </body>
+</html>
+}
+
+
+DIR_TEMPLATE= HEAD_TEMPLATE + %{
+    <h2>Directories</h2>
+    <ul>
+    <% dirs.each{|c| %>
+      <li><a href="<%=c%><%= File.directory?(File.join(path, c)) ? '/' : ''%>"/><%=c%></a></li>
+    <%}%>
+    </ul>
+    <h2>Files</h2>
+    <ul>
+    <% files.each{|c| %>
+      <li><a href="<%=c%><%= File.directory?(File.join(path, c)) ? '/' : ''%>"/><%=c%></a></li>
+    <%}%>
+    </ul>
+} + FOOT_TEMPLATE
+
+PAGE_TEMPLATE= HEAD_TEMPLATE + %{
+    <%= content %>
+} + FOOT_TEMPLATE
+
+FAVICON = "AAABAAMAICAQAAAAAADoAgAANgAAABAQEAAAAAAAKAEAAB4DAAAwMAAAAAAAAKgOAABGBAAAKAAA
+ACAAAABAAAAAAQAEAAAAAACAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAIAAAACAgACAAAAA
+gACAAICAAADAwMAAgICAAAAA/wAA/wAAAP//AP8AAAD/AP8A//8AAP///wAAAAAAAAAAAAAAAAAA
+AAAAd3d3d3d3d3d3d3d3d3d3cH//////f/////9//////3B/9wAH/3/3AAf/f/cAB/9wf3AAAH9/
+cAAAf39wAAB/cH8AAAAPfwAAAA9/AAAAD3B/AAAAD38AAAAPfwAAAA9wfwAAAA9/AAAAD38AAAAP
+cH9wAAB/f3AAAH9/cAAAf3B/9wAH/3/3AAf/f/cAB/9wf/////9//////3//////cHd3d3d3d3d3
+d3d3d3d3d3B//////3//////f/////9wf/////9//////3/3AAf/cH//////f/////9/cAAAf3B/
+/////3//////fwAAAA9wf/////9//////38AAAAPcH//////f/////9/AAAAD3B//////3//////
+f3AAAH9wf/////9//////3/3AAf/cH//////f/////9//////3B3d3d3d3d3d3d3d3d3d3dwf///
+//9//////3//////cH//////f/cAB/9//////3B//////39wAAB/f/////9wf/////9/AAAAD3//
+////cH//////fwAAAA9//////3B//////38AAAAPf/////9wf/////9/cAAAf3//////cH//////
+f/cAB/9//////3B//////3//////f/////9wd3d3d3d3d3d3d3d3d3d3cP////8AAAABAAAAAQAA
+AAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAA
+AQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAAB
+KAAAABAAAAAgAAAAAQAEAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAIAAAACAgACA
+AAAAgACAAICAAADAwMAAgICAAAAA/wAA/wAAAP//AP8AAAD/AP8A//8AAP///wB3d3d3d3d3d38A
+9/APfwD3cAAHAABwAAdwAAcAAHAAB38A9/APfwD3d3d3d3d3d3d///f//38A93//9///cAAHf//3
+//9wAAd///f//38A93d3d3d3d3d3f//38A9///d///cAAH//93//9wAAf//3f//38A9///d3d3d3
+d3d3dwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAoAAAAMAAAAGAAAAABAAgAAAAAAIAKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+gAAAgAAAAICAAIAAAACAAIAAgIAAAMDAwADA3MAA8MqmAAQEBAAICAgADAwMABEREQAWFhYAHBwc
+ACIiIgApKSkAVVVVAE1NTQBCQkIAOTk5AIB8/wBQUP8AkwDWAP/szADG1u8A1ufnAJCprQAAADMA
+AABmAAAAmQAAAMwAADMAAAAzMwAAM2YAADOZAAAzzAAAM/8AAGYAAABmMwAAZmYAAGaZAABmzAAA
+Zv8AAJkAAACZMwAAmWYAAJmZAACZzAAAmf8AAMwAAADMMwAAzGYAAMyZAADMzAAAzP8AAP9mAAD/
+mQAA/8wAMwAAADMAMwAzAGYAMwCZADMAzAAzAP8AMzMAADMzMwAzM2YAMzOZADMzzAAzM/8AM2YA
+ADNmMwAzZmYAM2aZADNmzAAzZv8AM5kAADOZMwAzmWYAM5mZADOZzAAzmf8AM8wAADPMMwAzzGYA
+M8yZADPMzAAzzP8AM/8zADP/ZgAz/5kAM//MADP//wBmAAAAZgAzAGYAZgBmAJkAZgDMAGYA/wBm
+MwAAZjMzAGYzZgBmM5kAZjPMAGYz/wBmZgAAZmYzAGZmZgBmZpkAZmbMAGaZAABmmTMAZplmAGaZ
+mQBmmcwAZpn/AGbMAABmzDMAZsyZAGbMzABmzP8AZv8AAGb/MwBm/5kAZv/MAMwA/wD/AMwAmZkA
+AJkzmQCZAJkAmQDMAJkAAACZMzMAmQBmAJkzzACZAP8AmWYAAJlmMwCZM2YAmWaZAJlmzACZM/8A
+mZkzAJmZZgCZmZkAmZnMAJmZ/wCZzAAAmcwzAGbMZgCZzJkAmczMAJnM/wCZ/wAAmf8zAJnMZgCZ
+/5kAmf/MAJn//wDMAAAAmQAzAMwAZgDMAJkAzADMAJkzAADMMzMAzDNmAMwzmQDMM8wAzDP/AMxm
+AADMZjMAmWZmAMxmmQDMZswAmWb/AMyZAADMmTMAzJlmAMyZmQDMmcwAzJn/AMzMAADMzDMAzMxm
+AMzMmQDMzMwAzMz/AMz/AADM/zMAmf9mAMz/mQDM/8wAzP//AMwAMwD/AGYA/wCZAMwzAAD/MzMA
+/zNmAP8zmQD/M8wA/zP/AP9mAAD/ZjMAzGZmAP9mmQD/ZswAzGb/AP+ZAAD/mTMA/5lmAP+ZmQD/
+mcwA/5n/AP/MAAD/zDMA/8xmAP/MmQD/zMwA/8z/AP//MwDM/2YA//+ZAP//zABmZv8AZv9mAGb/
+/wD/ZmYA/2b/AP//ZgAhAKUAX19fAHd3dwCGhoYAlpaWAMvLywCysrIA19fXAN3d3QDj4+MA6urq
+APHx8QD4+PgA8Pv/AKSgoACAgIAAAAD/AAD/AAAA//8A/wAAAP8A/wD//wAA////AAoKCgoKCgoK
+CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoK
+CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH
+BwcHBwcHBwcHBwcHBwcHBwcHBwcKCgf//////////////////wf//////////////////wf/////
+/////////////wcKCgf////z7EMKCkPs8////wf////z7EMKCkPs8////wf////z7EMKCkPs8///
+/wcKCgf///BDCgoKCgoKQ/D//wf///BDCgoKCgoKQ/D//wf///BDCgoKCgoKQ/D//wcKCgf/80MK
+CgoKCgoKCkPz/wf/80MKCgoKCgoKCkPz/wf/80MKCgoKCgoKCkPz/wcKCgf/7AoKCgoKCgoKCgrs
+/wf/7AoKCgoKCgoKCgrs/wf/7AoKCgoKCgoKCgrs/wcKCgf/QwoKCgoKCgoKCgpD/wf/QwoKCgoK
+CgoKCgpD/wf/QwoKCgoKCgoKCgpD/wcKCgf/CgoKCgoKCgoKCgoK/wf/CgoKCgoKCgoKCgoK/wf/
+CgoKCgoKCgoKCgoK/wcKCgf/CgoKCgoKCgoKCgoK/wf/CgoKCgoKCgoKCgoK/wf/CgoKCgoKCgoK
+CgoK/wcKCgf/QwoKCgoKCgoKCgpD/wf/QwoKCgoKCgoKCgpD/wf/QwoKCgoKCgoKCgpD/wcKCgf/
+7AoKCgoKCgoKCgrs/wf/7AoKCgoKCgoKCgrs/wf/7AoKCgoKCgoKCgrs/wcKCgf/80MKCgoKCgoK
+CkPz/wf/80MKCgoKCgoKCkPz/wf/80MKCgoKCgoKCkPz/wcKCgf///BDCgoKCgoKQ/D//wf///BD
+CgoKCgoKQ/D//wf///BDCgoKCgoKQ/D//wcKCgf////z7EMKCkPs8////wf////z7EMKCkPs8///
+/wf////z7EMKCkPs8////wcKCgf//////////////////wf//////////////////wf/////////
+/////////wcKCgcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcK
+Cgf//////////////////wf//////////////////wf//////////////////wcKCgf/////////
+/////////wf//////////////////wf////z7EMKCkPs8////wcKCgf//////////////////wf/
+/////////////////wf///BDCgoKCgoKQ/D//wcKCgf//////////////////wf/////////////
+/////wf/80MKCgoKCgoKCkPz/wcKCgf//////////////////wf//////////////////wf/7AoK
+CgoKCgoKCgrs/wcKCgf//////////////////wf//////////////////wf/QwoKCgoKCgoKCgpD
+/wcKCgf//////////////////wf//////////////////wf/CgoKCgoKCgoKCgoK/wcKCgf/////
+/////////////wf//////////////////wf/CgoKCgoKCgoKCgoK/wcKCgf/////////////////
+/wf//////////////////wf/QwoKCgoKCgoKCgpD/wcKCgf//////////////////wf/////////
+/////////wf/7AoKCgoKCgoKCgrs/wcKCgf//////////////////wf//////////////////wf/
+80MKCgoKCgoKCkPz/wcKCgf//////////////////wf//////////////////wf///BDCgoKCgoK
+Q/D//wcKCgf//////////////////wf//////////////////wf////z7EMKCkPs8////wcKCgf/
+/////////////////wf//////////////////wf//////////////////wcKCgcHBwcHBwcHBwcH
+BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcKCgf//////////////////wf/////
+/////////////wf//////////////////wcKCgf//////////////////wf////z7EMKCkPs8///
+/wf//////////////////wcKCgf//////////////////wf///BDCgoKCgoKQ/D//wf/////////
+/////////wcKCgf//////////////////wf/80MKCgoKCgoKCkPz/wf//////////////////wcK
+Cgf//////////////////wf/7AoKCgoKCgoKCgrs/wf//////////////////wcKCgf/////////
+/////////wf/QwoKCgoKCgoKCgpD/wf//////////////////wcKCgf//////////////////wf/
+CgoKCgoKCgoKCgoK/wf//////////////////wcKCgf//////////////////wf/CgoKCgoKCgoK
+CgoK/wf//////////////////wcKCgf//////////////////wf/QwoKCgoKCgoKCgpD/wf/////
+/////////////wcKCgf//////////////////wf/7AoKCgoKCgoKCgrs/wf/////////////////
+/wcKCgf//////////////////wf/80MKCgoKCgoKCkPz/wf//////////////////wcKCgf/////
+/////////////wf///BDCgoKCgoKQ/D//wf//////////////////wcKCgf/////////////////
+/wf////z7EMKCkPs8////wf//////////////////wcKCgf//////////////////wf/////////
+/////////wf//////////////////wcKCgcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH
+BwcHBwcHBwcHBwcHBwcKCv///////wAA////////AAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAA
+AAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAA
+AAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAA
+AAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAA
+AAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAA
+AwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAAD
+AAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMA
+AA=="
+
+
+# Parse command-line options.
+def parse
+  # Set up defaults
+  opts            = OpenStruct.new
+  opts.daemonise  = true
+  opts.port       = 8080
+  opts.path       = "./content/"
+  opts.default    = 'Index'
+
+  op = OptionParser.new do |o|
+    o.on('-p', '--port PORT', 'Port to listen on'){ |x| opts.port = x.to_i }
+    o.on('-i', '--index INDEX', 'Index page name'){ |x| opts.default = x.to_s }
+    o.on('-n', '--no-daemonise', 'Do not daemonise process'){ |x| opts.daemonise = false }
+    # o.on('-k', '--there-can-be-only-one', 'Only allow one instance (kill if a pid file is found)'){ |x| opts.kill = true }
+    o.on('-d', '--directory DIR', 'The directory in which to find content'){ |d| opts.path = d.to_s }
+  end
+  op.parse!
+
+  return opts
+end
+
+# Server that passes things onto the wiki engine
+class Server < WEBrick::HTTPServlet::AbstractServlet
+  def self.serve(port, bind=nil, local_resource_path="", engine=nil)
+    server = WEBrick::HTTPServer.new(:Port        => port, 
+                                     :BindAddress => bind)
+
+    # server.mount("/#{resources}",     WEBrick::HTTPServlet::FileHandler, local_resource_path, {:FancyIndexing => false})
+    server.mount("/", Server, {:engine => engine})
+
+    trap "INT" do server.shutdown end
+    server.start
+  end
+
+  def initialize(server, options={})
+    super(server, options)
+    @engine = options[:engine]
+  end
+
+  def do_GET(request, response)
+    status, content_type, body, cookies = @engine.get(request)
+    return build_response( response, status, cookies, content_type, body )
+  # rescue HTMLError => htmle 
+  #   return htmle.code, 'text/plain', "#{htmle}\n\n#{htmle.backtrace.join("\n")}", {}
+  # rescue Exception => e
+  #   return 500, 'text/plain', "#{e}\n\n#{e.backtrace.join("\n")}", {}
+  end
+
+  def do_POST(request, response)
+    status, content_type, body, cookies = @engine.post(request)
+    return build_response( response, status, cookies, content_type, body )
+  # rescue HTMLError => htmle 
+    # return htmle.code, 'text/plain', "#{htmle}\n\n#{htmle.backtrace.join("\n")}", {}
+  # rescue Exception => e
+  #   return 500, 'text/plain', "#{e}\n\n#{e.backtrace.join("\n")}", {}
+  end
+
+  private
+
+  # build a response to the client from the given data
+  def build_response( response, status, cookies, content_type, body )
+    response.status           = status || 200
+    cookies.each{ |k,v|         response.cookies << "#{k}=#{v}" }
+    response['Content-Type']  = content_type || 'text/plain'
+    response.body             = body || ''
+
+    return response
+  end
+end
+
+
+class HTMLError < Exception 
+  attr_reader :code
+
+  def initialize(msg, code)
+    super(msg)
+    @code = code
+  end
+
+end
+
+# Simple wiki engine
+class SimpleWikEngine
+  def initialize(path, default="Index", blacklist=['.', '..'], extensions=%w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text})
+    @basedir    = path
+    @extensions = extensions
+    @blacklist = blacklist 
+    @default = default
+  end
+
+  # get request
+  def get(req)
+    render(req)
+  end
+
+  # Post request, don't do anything special for now.
+  def post(req)
+    get(req)
+  end
+
+  private
+
+  def render(req, override_path=nil)
+    # Build path
+    path = override_path || File.join( @basedir, req.path )
+
+    # Render favicon
+    # avoid the correct MIME 'type image/vnd.microsoft.icon' because it doesn't work in ie
+    return 200, 'image/x-icon', render_favicon(), {} if req.path == '/favicon.ico'
+
+    # Check access to file or directory
+    raise HTMLError.new("Could not access path #{path}, though it exists.", 403) if File.exists?(path) and not File.readable?(path)
+
+    # Check for default file if path is dir
+    if File.directory?(path) then 
+      begin
+        return render(req, File.join(path, @default)) 
+      rescue HTMLError => htmle
+        return 200, 'text/html', generate_listing(path), {} if File.directory?(path)
+      end
+    end
+    
+    # Render file if found
+    if File.exists?(path)
+      mime, content = render_file(path)
+      return 200, mime, content, {} 
+    end
+
+    # Check for all possible extensions and recurse if found
+    @extensions.each{ |e|
+      return render(req, "#{path}.#{e}") if File.exists?(path + ".#{e}") 
+    }
+
+    # Blurt error to the user.
+    raise HTMLError.new("File not found: #{req.path}", 404)
+    return 200, 'text/plain', "#{req.path}", {}
+
+  end
+
+  def render_file(path)
+    mime = MIME::Types.type_for(path)
+    markdown_extension = @extensions.map{|e| File.extname(path).downcase == ".#{e}" }.include?(true)
+    if markdown_extension or mime.include?(MIME::Types['text/plain'][0])
+      content = Markdown.new( File.read(path) ).to_html 
+      return 'text/html', compose_template( PAGE_TEMPLATE, File.basename(path), File.dirname(path), mime[0], path, content )
+    end
+    
+    mime = mime[0] || MIME::Types['text/plain'][0]
+    return mime, File.open(path, (mime.binary?) ? 'rb' : 'r' ).read
+  end
+
+  def generate_listing(path)
+    return compose_template( DIR_TEMPLATE, File.basename(path), File.dirname(path), nil, path, nil )
+  end
+
+  def render_favicon()
+    return Base64.decode64(FAVICON)
+  end
+
+  def compose_template(template, title, pwd, mime, path, content)
+    # make local dir listing, with directories at the beginning
+    dirs    = []
+    files   = []
+    basedir = File.directory?(path) ? path : File.dirname(path)
+    Dir.foreach( basedir ){|d| 
+      if not @blacklist.include?(d) #and not File.identical(path, d) then
+        if File.directory?(File.join(basedir, d))
+          dirs << d
+        else
+          files << d
+        end
+      end
+    }
+
+    return ERB.new(template).result(binding)
+  end
+
+end
+
+
+# =============================================================================
+$opts = parse
+Server.serve( $opts.port, nil, $opts.path, SimpleWikEngine.new($opts.path, $opts.default) )
