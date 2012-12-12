@@ -230,7 +230,7 @@ HEAD_TEMPLATE = %q{
   <body>
     <div id="banner">
       <div id="menu">
-        <% if basedir != @basedir %>
+        <% if File.absolute_path(basedir) != File.absolute_path(@basedir) %>
         <a href="../">[&larr;]</a>
         <% end %>
         <%= dirs.map{|c|
@@ -637,25 +637,30 @@ AP/wP+J//wAA//C/43//AAD/8J/jv/8AAP/4z+Pf/wAA//jP49//AAD/+Ofj7/8AAP/4c+P3/wAA
 def parse
   # Set up defaults
   opts            = OpenStruct.new
-  opts.daemonise  = true
+  opts.daemonise  = false 
   opts.interface  = "127.0.0.1"
   opts.port       = 8080
-  opts.path       = "./content/"
+  opts.path       = "./"
   opts.default    = 'Index'
   opts.readonly   = false
   opts.editpass   = ''
   opts.cleandirs  = true 
+  opts.favicon    = FAVICON
+  opts.extensions = %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text} 
+  opts.blacklist  = []
 
   op = OptionParser.new do |o|
     o.on('-p', '--port PORT', 'Port to listen on'){ |x| opts.port = x.to_i }
     o.on('-D', '--default INDEX', 'Index page name'){ |x| opts.default = x.to_s }
-    o.on('-n', '--daemonise', 'Daemonise process'){ |x| opts.daemonise = false }
+    o.on('-n', '--daemonise', 'Daemonise process'){ |x| opts.daemonise = true }
     o.on('-i', '--interface INTERFACE', 'Listen on the given interface (default is 127.0.0.1, set to '' for all)'){|x| opts.interface = x.to_s }
     o.on('-r', '--read-only', 'Disable editing features'){ |x| opts.readonly = true }
     # o.on('-k', '--there-can-be-only-one', 'Only allow one instance (kill if a pid file is found)'){ |x| opts.kill = true }
     o.on('-d', '--directory DIR', 'The directory in which to find content'){ |d| opts.path = d.to_s }
     o.on('-e', '--edit-pw PASSWORD', 'The password to use to prevent editing (insecure without SSL)'){|x| opts.editpass = x.to_s } 
     o.on('-c', '--no-clean-dirs', 'Leave empty directories when deleting files'){|x| opts.cleandirs = false }
+    o.on('-f', '--favicon ICON', 'Read favicon from file'){|x| opts.favicon = Base64::encode64( File.open(x, 'rb').read() ) }
+    o.on('-b', '--blacklist REGEX', 'Blacklist a certain regex from file listings (i.e. hidden files, RCS files)'){|x| opts.blacklist << Regexp.new(x) }
   end
   op.parse!
 
@@ -671,7 +676,7 @@ class Server < WEBrick::HTTPServlet::AbstractServlet
     # server.mount("/#{resources}",     WEBrick::HTTPServlet::FileHandler, local_resource_path, {:FancyIndexing => false})
     server.mount("/", Server, {:engine => engine})
 
-    trap "INT" do server.shutdown end
+    %w{INT TERM HUP}.each{|s| trap s do server.shutdown end }
     server.start
   end
 
@@ -724,15 +729,24 @@ end
 
 # Simple wiki engine
 class SimpleWikEngine
-  def initialize(path, readonly=false, cleandirs=false, editpass='', default="Index", blacklist=['.', '..'], extensions=%w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text})
-    @basedir    = path
-    @extensions = extensions
-    @blacklist = blacklist 
-    @default = default
-    @readonly = readonly
-    @editpass = editpass
-    @error = []
-    @cleandirs = cleandirs
+  def initialize(path, 
+                 readonly=false, 
+                 cleandirs=false, 
+                 editpass='', 
+                 default="Index", 
+                 blacklist=[/^\.\.?$/],
+                 extensions=%w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text}, 
+                 favicon=nil)
+    @basedir      = path
+    @readonly     = readonly
+    @cleandirs    = cleandirs
+    @editpass     = editpass
+    @default      = default
+    @blacklist    = blacklist 
+    @extensions   = extensions.map{|x| ".#{x}"}
+    @favicon      = favicon
+
+    @error        = []
   end
 
   # get request
@@ -822,7 +836,10 @@ class SimpleWikEngine
 
     # Render favicon
     # avoid the correct MIME 'type image/vnd.microsoft.icon' because it doesn't work in ie
-    return 200, 'image/x-icon', render_favicon(), {} if req.path == '/favicon.ico'
+    if req.path == '/favicon.ico'
+      code, mime, icon = render_favicon();
+      return code, mime, icon, {}
+    end
 
     # Check access to file or directory
     raise "Could not access path #{path}, though it exists." if File.exists?(path) and not File.readable?(path)
@@ -844,12 +861,12 @@ class SimpleWikEngine
 
     # Check for all possible extensions and recurse if found
     @extensions.each{ |e|
-      return render(req, "#{path}.#{e}") if File.exists?(path + ".#{e}") 
+      return render(req, "#{path}#{e}") if File.exists?("#{path}#{e}") 
     }
 
       # Apply some heuristics to create some 'blank' edit pages
       path = "#{path}#{@default}" if  path.to_s[-1] == File::SEPARATOR
-      path = "#{path}.#{@extensions[0]}" if not @extensions.include?(File.extname(path)[1..-1])
+      path = "#{path}#{@extensions[0]}" if not @extensions.include?(File.extname(path))
       mime, content = render_file(path)
       return 200, mime, content, {}
     
@@ -863,7 +880,7 @@ class SimpleWikEngine
 
     # render if markdown by extension or mime
     mime = MIME::Types.type_for(path)
-    markdown_extension = @extensions.map{|e| File.extname(path).downcase == ".#{e}" }.include?(true)
+    markdown_extension = @extensions.map{|e| File.extname(path).downcase == e }.include?(true)
     if markdown_extension or mime.include?(MIME::Types['text/plain'][0])
       content = Markdown.new( File.read(path) ).to_html 
       return 'text/html; charset=UTF-8', compose_template( PAGE_TEMPLATE, File.basename(path), File.dirname(path), mime[0], path, content, :text )
@@ -875,7 +892,8 @@ class SimpleWikEngine
   end
 
   def render_favicon()
-    return Base64.decode64(FAVICON)
+    return 404, 'text/plain', 'No Favicon' if not @favicon
+    return 200, 'image/x-icon', Base64.decode64(@favicon)
   end
 
   def compose_template(template, title, pwd, mime, path, content, type=:text)
@@ -884,7 +902,7 @@ class SimpleWikEngine
     files   = []
     basedir = File.directory?(path) ? path : File.dirname(path)
     Dir.foreach( basedir ){|d| 
-      if not @blacklist.include?(d) #and not File.identical(path, d) then
+      if true != @blacklist.each{|b| break true if (d.to_s =~ b) }
         if File.directory?(File.join(basedir, d))
           dirs << d
         else
@@ -905,6 +923,21 @@ end
 
 # =============================================================================
 opts = parse
+
+if opts.daemonise then
+  puts "Forking to background..."
+  Process.daemon(true) 
+end
+
+
 Server.serve( opts.port, opts.interface, opts.path, 
-             SimpleWikEngine.new(opts.path, opts.readonly, opts.cleandirs, opts.editpass, opts.default) 
+             SimpleWikEngine.new(opts.path, 
+                                 opts.readonly, 
+                                 opts.cleandirs, 
+                                 opts.editpass, 
+                                 opts.default, 
+                                 [/^\.\.?$/] + opts.blacklist, 
+                                 opts.extensions, 
+                                 opts.favicon) 
             )
+  
