@@ -15,7 +15,7 @@ require 'fileutils'
 HEAD_TEMPLATE = %q{
 <html>
   <head>
-    <title><%= title %> -- Wik</title>
+    <title><%=h title %> -- Wik</title>
     <meta charset="UTF-8">
 
     <style type="text/css">
@@ -92,6 +92,29 @@ HEAD_TEMPLATE = %q{
       div#edit{
         padding: 1em 0;
         text-align: center;
+      }
+
+      div#errors{
+        border: solid 1px red;
+        margin: 0.2em;
+        padding: 0 0.2em;
+        background-color: #ffd;
+        font-size: smaller;
+      }
+
+      div#errors span#click_hide{
+        float: right;
+      }
+
+      div#errors ul{
+        margin: 0 0.1em;
+        padding: 0;
+      }
+
+      div#errors ul li{
+        list-style-type: none;
+        padding: 0.1em;
+        margin: 0.1em;
       }
 
       /* ------------ Main content styling ---------------- */
@@ -211,18 +234,34 @@ HEAD_TEMPLATE = %q{
         <a href="../">[&larr;]</a>
         <% end %>
         <%= dirs.map{|c|
-          c = "<a href='#{c}#{File.directory?(File.join(path, c)) ? '/' : ''}'/>#{h c}</a>"
+          c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}</a>"
         }.join(", ") %>
       </div>
       <h1><%= title %></h1>
     </div>
+
+    <!-- error listing -->
+    <% if @error.length > 0 %>
+      <div id="errors">
+        <span id="click_hide" onclick="javascript:document.getElementById('errors').style.display='none';">click to hide</span>
+        <ul>
+          <% @error.each{|e| %>
+            <li><%=h e%></li>
+          <% } %>
+        </ul>
+      </div>
+    <% end 
+    consume_errors %>
 }
 
 EDIT_TEMPLATE = %{
-  <% if type == :text %>
+  <% if type == :text and not @readonly %>
     <div id="edit">
       <form action="" method="POST">
         <textarea id="editbox" name="content"><%=h File.exist?(path) ? File.read(path) : '' %></textarea>
+        <% if @editpass.length > 0 %>
+          <label for="pass">Password:</label><input type="password" name="pass" value=""/><br/>
+        <% end %>
         <input type="hidden" value="<%=h path%>" name="path"/>
         <input type="reset" value="Reset"/>
         <input type="submit" value="Edit <%=h title%>"/>
@@ -245,34 +284,40 @@ END_TEMPLATE = %{
 }
 
 
-DIR_TEMPLATE= HEAD_TEMPLATE + %{
+DIR_TEMPLATE= %{
     <h2>Directories</h2>
     <ul>
     <% dirs.each{|c| %>
-      <li><a href="<%=c%><%= File.directory?(File.join(path, c)) ? '/' : ''%>"/><%=c%></a></li>
+      <li><a href="<%=h c%><%= File.directory?(File.join(basedir, c)) ? '/' : ''%>"/><%=h c%></a></li>
     <%}%>
     </ul>
     <h2>Files</h2>
     <ul>
     <% files.each{|c| %>
-      <li><a href="<%=c%><%= File.directory?(File.join(path, c)) ? '/' : ''%>"/><%=c%></a></li>
+      <li><a href="<%=h c%>"/><%=h c%></a></li>
     <%}%>
     </ul>
-} + FOOT_TEMPLATE + END_TEMPLATE
+} 
 
 PAGE_TEMPLATE= HEAD_TEMPLATE + %{
     <%= content %>
 } + FOOT_TEMPLATE + %{
-    <div id="hide_edit">
-      <span id="prompt">Hover to show edit box.</span>
-      <span id="prompt_stick" onclick="javascript:{document.getElementById('prompt_stick').style.display = 'none'; document.getElementById('prompt').style.display = 'none'; document.getElementById('edit').style.display = 'block';};">Click to pin edit box.</span>
+    <% if not @readonly %>
+      <div id="hide_edit">
+        <span id="prompt">Hover to show edit box.</span>
+        <span id="prompt_stick" onclick="javascript:{document.getElementById('prompt_stick').style.display = 'none'; document.getElementById('prompt').style.display = 'none'; document.getElementById('edit').style.display = 'block';};">Click to pin edit box.</span>
 } + EDIT_TEMPLATE + %{
-    </div>
+      </div>
+    <% end %>
 } + END_TEMPLATE
 
 MISSING_TEMPLATE = HEAD_TEMPLATE + %{
-  <h2>Missing Page: <%=h File.join(path)%></h2>
-} + EDIT_TEMPLATE + FOOT_TEMPLATE + END_TEMPLATE
+  <% if not @readonly %>
+    <h2>Editing Page: <%=h title%></h2>
+} + EDIT_TEMPLATE + %{
+  <hr/>
+  <% end %>
+} + DIR_TEMPLATE + FOOT_TEMPLATE + END_TEMPLATE
 
 FAVICON = "AAABAAMAICAQAAAAAADoAgAANgAAABAQEAAAAAAAKAEAAB4DAAAwMAAAAAAAAKgOAABGBAAAKAAA
 ACAAAABAAAAAAQAEAAAAAACAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAIAAAACAgACAAAAA
@@ -371,14 +416,18 @@ def parse
   opts.port       = 8080
   opts.path       = "./content/"
   opts.default    = 'Index'
+  opts.readonly   = false
+  opts.editpass   = ''
 
   op = OptionParser.new do |o|
     o.on('-p', '--port PORT', 'Port to listen on'){ |x| opts.port = x.to_i }
     o.on('-D', '--default INDEX', 'Index page name'){ |x| opts.default = x.to_s }
     o.on('-n', '--no-daemonise', 'Do not daemonise process'){ |x| opts.daemonise = false }
-    o.on('-i', '--interface', 'Listen on the given interface (default is 127.0.0.1)'){|x| opts.interface = x.to_s }
+    o.on('-i', '--interface INTERFACE', 'Listen on the given interface (default is 127.0.0.1)'){|x| opts.interface = x.to_s }
+    o.on('-r', '--read-only', 'Disable editing features'){ |x| opts.readonly = true }
     # o.on('-k', '--there-can-be-only-one', 'Only allow one instance (kill if a pid file is found)'){ |x| opts.kill = true }
     o.on('-d', '--directory DIR', 'The directory in which to find content'){ |d| opts.path = d.to_s }
+    o.on('-e', '--edit-pw PASSWORD', 'The password to use to prevent editing (insecure without SSL)'){|x| opts.editpass = x.to_s } 
   end
   op.parse!
 
@@ -406,8 +455,8 @@ class Server < WEBrick::HTTPServlet::AbstractServlet
   def do_GET(request, response)
     status, content_type, body, cookies = @engine.get(request)
     return build_response( response, status, cookies, content_type, body )
-  # rescue HTMLError => htmle 
-  #   return htmle.code, 'text/plain', "#{htmle}\n\n#{htmle.backtrace.join("\n")}", {}
+  #rescue HTMLError => htmle 
+  #  return htmle.code, 'text/plain', "#{htmle}\n\n#{htmle.backtrace.join("\n")}", {}
   # rescue Exception => e
   #   return 500, 'text/plain', "#{e}\n\n#{e.backtrace.join("\n")}", {}
   end
@@ -416,7 +465,7 @@ class Server < WEBrick::HTTPServlet::AbstractServlet
     status, content_type, body, cookies = @engine.post(request)
     return build_response( response, status, cookies, content_type, body )
   # rescue HTMLError => htmle 
-    # return htmle.code, 'text/plain', "#{htmle}\n\n#{htmle.backtrace.join("\n")}", {}
+  #   return htmle.code, 'text/plain', "#{htmle}\n\n#{htmle.backtrace.join("\n")}", {}
   # rescue Exception => e
   #   return 500, 'text/plain', "#{e}\n\n#{e.backtrace.join("\n")}", {}
   end
@@ -447,11 +496,14 @@ end
 
 # Simple wiki engine
 class SimpleWikEngine
-  def initialize(path, default="Index", blacklist=['.', '..'], extensions=%w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text})
+  def initialize(path, readonly=false, editpass='', default="Index", blacklist=['.', '..'], extensions=%w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text})
     @basedir    = path
     @extensions = extensions
     @blacklist = blacklist 
     @default = default
+    @readonly = readonly
+    @editpass = editpass
+    @error = []
   end
 
   # get request
@@ -461,11 +513,16 @@ class SimpleWikEngine
 
   # Post request, don't do anything special for now.
   def post(req)
+    return nonfatal(req, "Wik is in read-only mode") if @readonly
+
     params = CGI::parse(req.body)
 
     # Handle any parameters
     # First check we have both content and path
-    raise "Wrong parameters to POST Request" if not params.keys.include?('content') and params.keys.include?('path')
+    return nonfatal(req, "Wrong parameters to POST Request")  if not params.keys.include?('content') and params.keys.include?('path')
+    return nonfatal(req, "No password supplied!")             if @editpass.length > 0 and not params.keys.include?('pass')
+    return nonfatal(req, "Wrong password!")                   if @editpass.length > 0 and @editpass != params['pass'][0].to_s
+  
 
     #Check path.  IF it doesn't exist, create it
     path = params['path'][0].to_s 
@@ -477,8 +534,8 @@ class SimpleWikEngine
       # if the thing is not a directory, touch it
       FileUtils.touch(path) if path[-1] != File::SEPARATOR
     end
-    raise "Cannot write to that path, as it is a directory!" if File.directory?(path)
-    raise "Permission denied trying to write to #{path}" if not File.writable?(path)
+    return nonfatal(req, "Cannot write to that path, as it is a directory!") if File.directory?(path)
+    return nonfatal(req, "Permission denied trying to write to #{path}") if not File.writable?(path)
     # here the file pointed to at path should be writable and present
 
     # write data
@@ -492,6 +549,21 @@ class SimpleWikEngine
 
   private
 
+  # Add an error to the list, then call get
+  # Allows processing of requests half-way through
+  def nonfatal(req, msg)
+    @error << msg
+    return get(req)
+  end
+
+  def error(path, msg, code)
+    return code, "text/html", "ERRL #{msg}", {}
+  end
+
+  def consume_errors()
+    @error = []
+  end
+
   def render(req, override_path=nil)
     # Build path
     path = override_path || File.join( @basedir, req.path )
@@ -501,16 +573,16 @@ class SimpleWikEngine
     return 200, 'image/x-icon', render_favicon(), {} if req.path == '/favicon.ico'
 
     # Check access to file or directory
-    raise HTMLError.new("Could not access path #{path}, though it exists.", 403) if File.exists?(path) and not File.readable?(path)
+    raise "Could not access path #{path}, though it exists." if File.exists?(path) and not File.readable?(path)
 
     # Check for default file if path is dir
-    if File.directory?(path) then 
-      begin
-        return render(req, File.join(path, @default)) 
-      rescue HTMLError => htmle
-        return 200, 'text/html', generate_listing(path), {} if File.directory?(path)
-      end
-    end
+    return render(req, File.join(path, @default)) if File.directory?(path) 
+      #begin
+      #   
+      #rescue Exception => htmle
+      #  return 200, 'text/html', generate_listing(path), {} if File.directory?(path)
+      #end
+   # end
     
     # Render file if found
     if File.exists?(path)
@@ -523,19 +595,19 @@ class SimpleWikEngine
       return render(req, "#{path}.#{e}") if File.exists?(path + ".#{e}") 
     }
 
-    # Apply some heuristics to create some 'blank' edit pages
-    path = "#{path}#{@default}" if path.to_s[-1] == File::SEPARATOR
-    path = "#{path}.#{@extensions[0]}" if not @extensions.include?(File.extname(path)[1..-1])
-    mime, content = render_file(path)
-    return 200, mime, content, {}
-
-    #raise HTMLError.new("File not found: #{req.path}", 404)
+      # Apply some heuristics to create some 'blank' edit pages
+      path = "#{path}#{@default}" if  path.to_s[-1] == File::SEPARATOR
+      path = "#{path}.#{@extensions[0]}" if not @extensions.include?(File.extname(path)[1..-1])
+      mime, content = render_file(path)
+      return 200, mime, content, {}
+    
+    raise "File not found: #{req.path}"
     #return 200, 'text/plain', "#{req.path}", {}
   end
 
   def render_file(path)
     # Return blank edit page if no file exists
-    return "text/html; charset=UTF-8", compose_template(MISSING_TEMPLATE, File.basename(path), File.dirname(path), MIME::Types['text/plain'], path, '', :text) if not File.exist?(path) 
+    return "text/html; charset=UTF-8", compose_template(MISSING_TEMPLATE, File.basename(path), File.dirname(path), MIME::Types['text/plain'], path, '', :text) if not File.exist?(path) #and not @readonly 
 
     # render if markdown by extension or mime
     mime = MIME::Types.type_for(path)
@@ -548,10 +620,6 @@ class SimpleWikEngine
     # else simply output the content raw (for binary types, html, etc)
     mime = mime[0] || MIME::Types['text/plain'][0]
     return mime, File.open(path, (mime.binary?) ? 'rb' : 'r' ).read
-  end
-
-  def generate_listing(path)
-    return compose_template( DIR_TEMPLATE, File.basename(path), File.dirname(path), nil, path, nil, :directory )
   end
 
   def render_favicon()
@@ -585,4 +653,6 @@ end
 
 # =============================================================================
 $opts = parse
-Server.serve( $opts.port, $opts.interface, $opts.path, SimpleWikEngine.new($opts.path, $opts.default) )
+Server.serve( $opts.port, $opts.interface, $opts.path, 
+             SimpleWikEngine.new($opts.path, $opts.readonly, $opts.editpass, $opts.default) 
+            )
