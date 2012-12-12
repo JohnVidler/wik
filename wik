@@ -10,7 +10,7 @@ require 'mime/types'
 require 'erb'
 require 'cgi' # for escaping only
 require 'fileutils'
-
+require 'pathname'  # for removing dirs
 
 HEAD_TEMPLATE = %q{
 <html>
@@ -319,92 +319,318 @@ MISSING_TEMPLATE = HEAD_TEMPLATE + %{
   <% end %>
 } + DIR_TEMPLATE + FOOT_TEMPLATE + END_TEMPLATE
 
-FAVICON = "AAABAAMAICAQAAAAAADoAgAANgAAABAQEAAAAAAAKAEAAB4DAAAwMAAAAAAAAKgOAABGBAAAKAAA
-ACAAAABAAAAAAQAEAAAAAACAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAIAAAACAgACAAAAA
-gACAAICAAADAwMAAgICAAAAA/wAA/wAAAP//AP8AAAD/AP8A//8AAP///wAAAAAAAAAAAAAAAAAA
-AAAAd3d3d3d3d3d3d3d3d3d3cH//////f/////9//////3B/9wAH/3/3AAf/f/cAB/9wf3AAAH9/
-cAAAf39wAAB/cH8AAAAPfwAAAA9/AAAAD3B/AAAAD38AAAAPfwAAAA9wfwAAAA9/AAAAD38AAAAP
-cH9wAAB/f3AAAH9/cAAAf3B/9wAH/3/3AAf/f/cAB/9wf/////9//////3//////cHd3d3d3d3d3
-d3d3d3d3d3B//////3//////f/////9wf/////9//////3/3AAf/cH//////f/////9/cAAAf3B/
-/////3//////fwAAAA9wf/////9//////38AAAAPcH//////f/////9/AAAAD3B//////3//////
-f3AAAH9wf/////9//////3/3AAf/cH//////f/////9//////3B3d3d3d3d3d3d3d3d3d3dwf///
-//9//////3//////cH//////f/cAB/9//////3B//////39wAAB/f/////9wf/////9/AAAAD3//
-////cH//////fwAAAA9//////3B//////38AAAAPf/////9wf/////9/cAAAf3//////cH//////
-f/cAB/9//////3B//////3//////f/////9wd3d3d3d3d3d3d3d3d3d3cP////8AAAABAAAAAQAA
-AAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAA
-AQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAAB
-KAAAABAAAAAgAAAAAQAEAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAIAAAACAgACA
-AAAAgACAAICAAADAwMAAgICAAAAA/wAA/wAAAP//AP8AAAD/AP8A//8AAP///wB3d3d3d3d3d38A
-9/APfwD3cAAHAABwAAdwAAcAAHAAB38A9/APfwD3d3d3d3d3d3d///f//38A93//9///cAAHf//3
-//9wAAd///f//38A93d3d3d3d3d3f//38A9///d///cAAH//93//9wAAf//3f//38A9///d3d3d3
-d3d3dwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-AAAAAAAAAAAAAAAoAAAAMAAAAGAAAAABAAgAAAAAAIAKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-gAAAgAAAAICAAIAAAACAAIAAgIAAAMDAwADA3MAA8MqmAAQEBAAICAgADAwMABEREQAWFhYAHBwc
-ACIiIgApKSkAVVVVAE1NTQBCQkIAOTk5AIB8/wBQUP8AkwDWAP/szADG1u8A1ufnAJCprQAAADMA
-AABmAAAAmQAAAMwAADMAAAAzMwAAM2YAADOZAAAzzAAAM/8AAGYAAABmMwAAZmYAAGaZAABmzAAA
-Zv8AAJkAAACZMwAAmWYAAJmZAACZzAAAmf8AAMwAAADMMwAAzGYAAMyZAADMzAAAzP8AAP9mAAD/
-mQAA/8wAMwAAADMAMwAzAGYAMwCZADMAzAAzAP8AMzMAADMzMwAzM2YAMzOZADMzzAAzM/8AM2YA
-ADNmMwAzZmYAM2aZADNmzAAzZv8AM5kAADOZMwAzmWYAM5mZADOZzAAzmf8AM8wAADPMMwAzzGYA
-M8yZADPMzAAzzP8AM/8zADP/ZgAz/5kAM//MADP//wBmAAAAZgAzAGYAZgBmAJkAZgDMAGYA/wBm
-MwAAZjMzAGYzZgBmM5kAZjPMAGYz/wBmZgAAZmYzAGZmZgBmZpkAZmbMAGaZAABmmTMAZplmAGaZ
-mQBmmcwAZpn/AGbMAABmzDMAZsyZAGbMzABmzP8AZv8AAGb/MwBm/5kAZv/MAMwA/wD/AMwAmZkA
-AJkzmQCZAJkAmQDMAJkAAACZMzMAmQBmAJkzzACZAP8AmWYAAJlmMwCZM2YAmWaZAJlmzACZM/8A
-mZkzAJmZZgCZmZkAmZnMAJmZ/wCZzAAAmcwzAGbMZgCZzJkAmczMAJnM/wCZ/wAAmf8zAJnMZgCZ
-/5kAmf/MAJn//wDMAAAAmQAzAMwAZgDMAJkAzADMAJkzAADMMzMAzDNmAMwzmQDMM8wAzDP/AMxm
-AADMZjMAmWZmAMxmmQDMZswAmWb/AMyZAADMmTMAzJlmAMyZmQDMmcwAzJn/AMzMAADMzDMAzMxm
-AMzMmQDMzMwAzMz/AMz/AADM/zMAmf9mAMz/mQDM/8wAzP//AMwAMwD/AGYA/wCZAMwzAAD/MzMA
-/zNmAP8zmQD/M8wA/zP/AP9mAAD/ZjMAzGZmAP9mmQD/ZswAzGb/AP+ZAAD/mTMA/5lmAP+ZmQD/
-mcwA/5n/AP/MAAD/zDMA/8xmAP/MmQD/zMwA/8z/AP//MwDM/2YA//+ZAP//zABmZv8AZv9mAGb/
-/wD/ZmYA/2b/AP//ZgAhAKUAX19fAHd3dwCGhoYAlpaWAMvLywCysrIA19fXAN3d3QDj4+MA6urq
-APHx8QD4+PgA8Pv/AKSgoACAgIAAAAD/AAD/AAAA//8A/wAAAP8A/wD//wAA////AAoKCgoKCgoK
-CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoK
-CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH
-BwcHBwcHBwcHBwcHBwcHBwcHBwcKCgf//////////////////wf//////////////////wf/////
-/////////////wcKCgf////z7EMKCkPs8////wf////z7EMKCkPs8////wf////z7EMKCkPs8///
-/wcKCgf///BDCgoKCgoKQ/D//wf///BDCgoKCgoKQ/D//wf///BDCgoKCgoKQ/D//wcKCgf/80MK
-CgoKCgoKCkPz/wf/80MKCgoKCgoKCkPz/wf/80MKCgoKCgoKCkPz/wcKCgf/7AoKCgoKCgoKCgrs
-/wf/7AoKCgoKCgoKCgrs/wf/7AoKCgoKCgoKCgrs/wcKCgf/QwoKCgoKCgoKCgpD/wf/QwoKCgoK
-CgoKCgpD/wf/QwoKCgoKCgoKCgpD/wcKCgf/CgoKCgoKCgoKCgoK/wf/CgoKCgoKCgoKCgoK/wf/
-CgoKCgoKCgoKCgoK/wcKCgf/CgoKCgoKCgoKCgoK/wf/CgoKCgoKCgoKCgoK/wf/CgoKCgoKCgoK
-CgoK/wcKCgf/QwoKCgoKCgoKCgpD/wf/QwoKCgoKCgoKCgpD/wf/QwoKCgoKCgoKCgpD/wcKCgf/
-7AoKCgoKCgoKCgrs/wf/7AoKCgoKCgoKCgrs/wf/7AoKCgoKCgoKCgrs/wcKCgf/80MKCgoKCgoK
-CkPz/wf/80MKCgoKCgoKCkPz/wf/80MKCgoKCgoKCkPz/wcKCgf///BDCgoKCgoKQ/D//wf///BD
-CgoKCgoKQ/D//wf///BDCgoKCgoKQ/D//wcKCgf////z7EMKCkPs8////wf////z7EMKCkPs8///
-/wf////z7EMKCkPs8////wcKCgf//////////////////wf//////////////////wf/////////
-/////////wcKCgcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcK
-Cgf//////////////////wf//////////////////wf//////////////////wcKCgf/////////
-/////////wf//////////////////wf////z7EMKCkPs8////wcKCgf//////////////////wf/
-/////////////////wf///BDCgoKCgoKQ/D//wcKCgf//////////////////wf/////////////
-/////wf/80MKCgoKCgoKCkPz/wcKCgf//////////////////wf//////////////////wf/7AoK
-CgoKCgoKCgrs/wcKCgf//////////////////wf//////////////////wf/QwoKCgoKCgoKCgpD
-/wcKCgf//////////////////wf//////////////////wf/CgoKCgoKCgoKCgoK/wcKCgf/////
-/////////////wf//////////////////wf/CgoKCgoKCgoKCgoK/wcKCgf/////////////////
-/wf//////////////////wf/QwoKCgoKCgoKCgpD/wcKCgf//////////////////wf/////////
-/////////wf/7AoKCgoKCgoKCgrs/wcKCgf//////////////////wf//////////////////wf/
-80MKCgoKCgoKCkPz/wcKCgf//////////////////wf//////////////////wf///BDCgoKCgoK
-Q/D//wcKCgf//////////////////wf//////////////////wf////z7EMKCkPs8////wcKCgf/
-/////////////////wf//////////////////wf//////////////////wcKCgcHBwcHBwcHBwcH
-BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcKCgf//////////////////wf/////
-/////////////wf//////////////////wcKCgf//////////////////wf////z7EMKCkPs8///
-/wf//////////////////wcKCgf//////////////////wf///BDCgoKCgoKQ/D//wf/////////
-/////////wcKCgf//////////////////wf/80MKCgoKCgoKCkPz/wf//////////////////wcK
-Cgf//////////////////wf/7AoKCgoKCgoKCgrs/wf//////////////////wcKCgf/////////
-/////////wf/QwoKCgoKCgoKCgpD/wf//////////////////wcKCgf//////////////////wf/
-CgoKCgoKCgoKCgoK/wf//////////////////wcKCgf//////////////////wf/CgoKCgoKCgoK
-CgoK/wf//////////////////wcKCgf//////////////////wf/QwoKCgoKCgoKCgpD/wf/////
-/////////////wcKCgf//////////////////wf/7AoKCgoKCgoKCgrs/wf/////////////////
-/wcKCgf//////////////////wf/80MKCgoKCgoKCkPz/wf//////////////////wcKCgf/////
-/////////////wf///BDCgoKCgoKQ/D//wf//////////////////wcKCgf/////////////////
-/wf////z7EMKCkPs8////wf//////////////////wcKCgf//////////////////wf/////////
-/////////wf//////////////////wcKCgcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcH
-BwcHBwcHBwcHBwcHBwcKCv///////wAA////////AAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAA
-AAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAA
-AAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAA
-AAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAA
-AAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAA
-AwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAAD
-AAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAADAAAAAAAAAAMA
-AA=="
+FAVICON = "AAABAAMAICEAAAEAIAAsEQAANgAAABAaAAABACAAEAcAAGIRAAAwOQAAAQAgALAsAAByGAAAKAAA
+ACAAAABCAAAAAQAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+AAAAUwAAACv///8A////AP///wD///8A////AP///wAAAAAdAAAAVAAAAAj///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wAAAACYAAAA/AAAADL///8A////AP///wD///8A////AAAAAC8AAAD/AAAA
+rwAAAAH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AAAAAG4AAAD/AAAAzwAAAAX///8A////AP///wD/
+//8AAAAAJgAAAP8AAAD/AAAAY////wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAARQAAAP8AAAD6AAAA
+e////wD///8A////AP///wAAAAAeAAAA/wAAAPYAAACxAAAAJP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAA
+AAAbAAAA/wAAANsAAAC8AAAAKv///wD///8A////AAAAABUAAAD/AAAA9AAAABgAAACwAAAABf//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AAAAAAEAAADyAAAA/gAAADIAAADAAAAAA////wD///8AAAAADAAAAP8AAAD0
+////AAAAAEQAAACF////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AAAAAMgAAAD/AAAAMwAAAIEAAABw////AP//
+/wAAAAAHAAAA/wAAAPT///8A////AAAAAIEAAABG////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AAAAAAH///8A////AP///wD///8AAAAAnwAAAP8AAABg
+AAAACAAAAM4AAAAj////AAAAAAYAAAD/AAAA9P///wD///8AAAAABAAAALIAAAAY////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAiAAAAJcAAAAU////AP//
+/wAAAAB1AAAA/wAAAI3///8AAAAAPwAAAL0AAAABAAAABQAAAP8AAAD0////AP///wD///8AAAAA
+NwAAALgAAAAB////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAADk
+AAAA/wAAAJT///8A////AAAAAEwAAAD/AAAAuf///wD///8AAAAAnQAAAGYAAAAEAAAA/wAAAPT/
+//8A////AP///wD///8AAAAAoQAAAF7///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AAAAAPIAAAD/AAAAKP///wD///8AAAAAIgAAAP8AAADm////AP///wAAAAASAAAA
+2wAAAB8AAAD/AAAA9P///wD///8A////AP///wAAAAAbAAAA5wAAABT///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8AAAAAwQAAAP4AAAAE////AP///wAAAAADAAAA9wAAAP8A
+AAAT////AP///wAAAABaAAAAtQAAAP8AAAD0////AP///wD///8A////AP///wAAAACwAAAAmf//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAABEAAAA/wAAADT///8A////
+AP///wAAAADPAAAA/wAAAED///8A////AAAAAAEAAAC4AAAA/wAAAPT///8A////AP///wD///8A
+////AAAAAFQAAAD5AAAAFv///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAA
+AABnAAAA3AAAAEsAAAATAAAACAAAAKYAAAD/AAAAbP///wD///8A////AAAAACEAAAD2AAAA9v//
+/wD///8A////AP///wD///8AAAAAJAAAAP8AAAB+////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wAAAAAoAAAAmgAAANYAAAD2AAAA+AAAAPsAAADVAAAAOP///wD///8A
+////AAAAAGQAAADr////AP///wD///8A////AP///wAAAAALAAAA/wAAAL////8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AAAAAA3///8A////AP///wD///8A////AAAAADQAAAD/AAAA
+5v///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8AAAAAsgAAAP8AAADL////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wAAAAAeAAAApAAAAFX///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//////////////////
+/////////////////////////5/P///Pz///z8f//8fL///Lzf//y83//83O//nmz3/45s9/+edP
+v/nnj5/954/f/ufP3/8D78/////P////j////9//////////////////////////////////////
+/////ygAAAAQAAAANAAAAAEAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAA////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AAAA
+AAgAAADfAAAAwwAAACkAAAAJAAAA4QAAAMUAAAA0////AP///wD///8A////AP///wD///8A////
+AP///wAAAAAZAAAA/wAAAEUAAACDAAAARAAAAP8AAABHAAAAhQAAAD3///8A////AP///wD///8A
+////AP///wD///8AAAAAAQAAAOYAAAAaAAAAAQAAAHEAAAD+AAAAIAAAAAEAAACJAAAALf///wD/
+//8A////AP///wD///8A////AP///wAAAACCAAAAXv///wAAAAAEAAAA0gAAAFv///8AAAAADgAA
+ALIAAAAB////AP///wD///8A////AAAAABsAAABAAAAACgAAAKoAAAAH////AAAAAG8AAACy////
+AP///wAAAACMAAAAWP///wD///8A////AP///wD///8AAAAAgQAAAAwAAAAyAAAAlgAAAAEAAAAb
+AAAA+QAAABP///8AAAAAUgAAAKr///8A////AP///wD///8A////AAAAAEwAAADZAAAA2AAAANYA
+AABX////AAAAAIIAAABK////AAAAAC0AAADo////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wAAAAATAAAApP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//
+AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA8z8AAPVfAAD3bwAA93cAAPu3AADtuwAA8bsA
+AP/7AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAAKAAAADAAAAByAAAA
+AQAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAApgAAAHIAAAAk////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAoAAAAGkAAAAU////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAABAAAAAQAAAAEA
+AAABAAAAvAAAAP8AAAD/AAAAP////wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8AAAAAywAAAP8AAAD1AAAAIf///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wAAAAABAAAAAQAAAAEAAAABAAAAkwAAAP8AAAD/AAAA3gAAAAz///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8AAAAAvAAAAP8AAAD/AAAAuAAAAAH///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wAAAAABAAAAAgAAAAEAAAABAAAAagAAAP8AAAD/
+AAAA/wAAAJf///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAArAAAAP8A
+AAD/AAAA/wAAAFv///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAB////
+AP///wD///8AAAAAPwAAAP8AAAD/AAAA/wAAAP8AAABF////AP///wD///8A////AP///wD///8A
+////AP///wD///8AAAAAnQAAAP8AAAD/AAAA/wAAAOwAAAAf////AAAAAAH///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8AAAAAFgAAAP8AAAD/AAAA/wAAAP4AAADjAAAA
+D////wD///8A////AP///wD///8A////AP///wD///8AAAAAjgAAAP8AAAD/AAAA/wAAAHoAAADG
+AAAABf///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAAQAA
+AO0AAAD/AAAA/wAAAK4AAAD5AAAAnv///wD///8A////AP///wD///8A////AP///wD///8AAAAA
+fgAAAP8AAAD/AAAA/wAAAAIAAAC1AAAAhv///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AAAAAMMAAAD/AAAA/wAAAK8AAAB7AAAA/wAAAEz///8A////AP//
+/wD///8A////AP///wD///8AAAAAbwAAAP8AAAD/AAAA/////wAAAAASAAAA3gAAAEX///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AAAAAJoAAAD/AAAA/wAAANsA
+AAAFAAAAzgAAAOcAAAAS////AP///wD///8A////AP///wD///8AAAAAXwAAAP8AAAD/AAAA////
+/wD///8AAAAANQAAAOEAAAAW////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AAAAAHAAAAD/AAAA/wAAAP4AAAAKAAAAMAAAAPsAAACl////AP///wD///8A////AP///wD/
+//8AAAAAUAAAAP8AAAD/AAAA/////wD///8A////AAAAAGoAAAC3AAAAAv///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AAAAAEcAAAD/AAAA/wAAAP8AAAAz////AAAAAIIAAAD/
+AAAAUv///wD///8A////AP///wD///8AAAAARwAAAP8AAAD/AAAA/////wD///8A////AAAAAAEA
+AACmAAAAcf///wD///8A////AP///wD///8A////AP///wD///8A////AAAAAAH///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AAAAAB4AAAD/AAAA
+/wAAAP8AAABf////AAAAAAYAAADTAAAA6gAAABX///8A////AP///wD///8AAAAAQAAAAP8AAAD/
+AAAA/////wD///8A////AP///wAAAAAMAAAA0AAAADP///8A////AP///wD///8A////AP///wD/
+//8A////AAAAAAH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AAAAAAEAAADzAAAA/wAAAP8AAACL////AP///wAAAAA1AAAA/QAAAKsAAAAB////
+AP///wD///8AAAAAOQAAAP8AAAD/AAAA/////wD///8A////AP///wD///8AAAAALAAAANMAAAAN
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAA
+AAAHAAAAWwAAAAH///8A////AP///wD///8A////AP///wAAAADLAAAA/wAAAP8AAAC3////AP//
+/wD///8AAAAAiAAAAP8AAABY////AP///wD///8AAAAAMgAAAP8AAAD/AAAA/////wD///8A////
+AP///wD///8A////AAAAAH0AAACg////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wAAAABfAAAA/wAAAMAAAAAo////AP///wD///8A////AP///wAA
+AACiAAAA/wAAAP8AAADk////AP///wD///8AAAAACAAAANgAAADtAAAAGP///wD///8AAAAAKwAA
+AP8AAAD/AAAA/////wD///8A////AP///wD///8A////AAAAAAYAAADSAAAAWP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAC9AAAA/wAAAP8AAAD5
+AAAAPP///wD///8A////AP///wAAAAB4AAAA/wAAAP8AAAD/AAAAEf///wD///8A////AAAAADoA
+AAD+AAAAsgAAAAH///8AAAAAJAAAAP8AAAD/AAAA/wAAAAP///8A////AP///wD///8A////AP//
+/wAAAAA6AAAA6QAAABH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wAAAADjAAAA/wAAAP8AAADlAAAACP///wD///8A////AP///wAAAABPAAAA/wAAAP8AAAD/
+AAAAPP///wD///8A////AP///wAAAACTAAAA/wAAAF////8AAAAAHAAAAP8AAAD/AAAA/wAAAAn/
+//8A////AP///wD///8A////AP///wD///8AAAAArQAAAJj///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wAAAAD2AAAA/wAAAP8AAABw////AP///wD///8A////
+AP///wAAAAAmAAAA/wAAAP8AAAD/AAAAaP///wD///8A////AP///wAAAAAPAAAA5wAAAPAAAAAc
+AAAAFQAAAP8AAAD/AAAA/wAAAA7///8A////AP///wD///8A////AP///wD///8AAAAAJgAAAPsA
+AAA5////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAADQAAAA/wAA
+AP8AAAA1////AP///wD///8A////AP///wAAAAAEAAAA+QAAAP8AAAD/AAAAlP///wD///8A////
+AP///wD///8AAAAAWAAAAP8AAAC5AAAADwAAAP8AAAD/AAAA/wAAABT///8A////AP///wD///8A
+////AP///wD///8A////AAAAALUAAADSAAAABf///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wAAAAClAAAA/wAAAP8AAAAO////AP///wD///8A////AP///wD///8AAAAA0wAA
+AP8AAAD/AAAAwP///wD///8A////AP///wD///8AAAAAAQAAALoAAAD/AAAAbAAAAP8AAAD/AAAA
+/wAAABr///8A////AP///wD///8A////AP///wD///8A////AAAAAFIAAAD/AAAAc////wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wAAAABKAAAA/wAAAP8AAAAX////AP///wD/
+//8A////AP///wD///8AAAAAqgAAAP8AAAD/AAAA7AAAAAH///8A////AP///wD///8A////AAAA
+ACUAAAD4AAAA9AAAAP8AAAD/AAAA/wAAACD///8A////AP///wD///8A////AP///wD///8A////
+AAAAAAYAAADqAAAA6gAAAAj///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAB
+AAAAwAAAAP8AAABe////AP///wD///8A////AP///wD///8AAAAAgAAAAP8AAAD/AAAA/wAAABj/
+//8A////AP///wD///8A////AP///wAAAAB+AAAA/wAAAP8AAAD/AAAA/wAAACX///8A////AP//
+/wD///8A////AP///wAAAAAB////AAAAAAEAAACSAAAA/wAAAGD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8AAAAALQAAAO4AAADkAAAAIP///wD///8A////AP///wD///8A
+AAAAVwAAAP8AAAD/AAAA/wAAAET///8A////AP///wD///8A////AP///wAAAAAHAAAA2QAAAP8A
+AAD/AAAA/wAAACz///8A////AP///wD///8A////AP///wAAAAABAAAAAQAAAAEAAABgAAAA/wAA
+AM4AAAAB////AP///wD///8A////AP///wD///8A////AP///wD///8A////AAAAAC4AAADpAAAA
+8QAAAIcAAABIAAAAHAAAABIAAAALAAAAMQAAAP8AAAD/AAAA/wAAAHD///8A////AP///wD///8A
+////AP///wD///8AAAAAQwAAAP8AAAD/AAAA/wAAADn///8A////AP///wAAAAABAAAAAQAAAAEA
+AAAB////AP///wAAAAA3AAAA/wAAAP8AAAA9////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wAAAAAhAAAApgAAAP4AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA
+/wAAALEAAAAI////AP///wD///8A////AP///wD///8A////AAAAAKUAAAD/AAAA/wAAAEn///8A
+////AP///wD///8A////AP///wD///8A////AP///wAAAAAPAAAA/wAAAP8AAACR////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AAAAACsAAACcAAAA3wAA
+APsAAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAADoAAAARP///wD///8A////AP///wD///8A////
+AAAAABcAAACsAAAA/AAAAFj///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAb
+AAAA/wAAAP8AAADM////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AAAAAAMAAAALAAAADQAAAA8AAAASAAAAFAAAABYAAAAYAAAAF///
+/wD///8A////AP///wD///8A////AP///wD///8AAAAAHAAAACb///8A////AP///wD///8A////
+AP///wD///8A////AP///wAAAABCAAAA/wAAAP8AAADs////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAACCAAAA/wAAAP8AAAD7////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AAAA
+ACMAAADxAAAA/wAAAP8AAADr////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AAAAAE0AAAD4AAAA/wAAAP8AAAC3////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAAwAAAAwwAAAMkA
+AAA3////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8AAAAAAQAAAAH///8A////AAAAAAH///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
+AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A
+////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/
+//8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP//
+/wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8AAAAAAQAAAAH///8A////
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///////wAA////////AAD///////8AAP//////
+/wAA////////AAD///////8AAP///////wAA////////AAD///////8AAP///////wAA////////
+AAD///////8AAP/v/9///wAA/+P/x///AAD/4f/D//8AAP/w/8P//wAA//D/wf//AAD/8H/C//8A
+AP/wP+J//wAA//C/43//AAD/8J/jv/8AAP/4z+Pf/wAA//jP49//AAD/+Ofj7/8AAP/4c+P3/wAA
+//hz4/v/AAD5+Hnj+/8AAPD8fOP9/wAA8Px84/z/AADx/H5j/v8AAPH8PyP+fwAA8fw/I/9/AAD5
+/D+D/z8AAPn8P8P/PwAA/P4/w/+fAAD+Pj/j/58AAP8AH+P/jwAA/8AP8/+PAAD//////48AAP//
+////DwAA//////8PAAD//////w8AAP//////nwAA////////AAD///////8AAP///////wAA////
+////AAD///////8AAP///////wAA////////AAD///////8AAP///////wAA////////AAD/////
+//8AAP///////wAA////////AAD///////8AAA=="
+
 
 
 # Parse command-line options.
@@ -418,16 +644,18 @@ def parse
   opts.default    = 'Index'
   opts.readonly   = false
   opts.editpass   = ''
+  opts.cleandirs  = true 
 
   op = OptionParser.new do |o|
     o.on('-p', '--port PORT', 'Port to listen on'){ |x| opts.port = x.to_i }
     o.on('-D', '--default INDEX', 'Index page name'){ |x| opts.default = x.to_s }
-    o.on('-n', '--no-daemonise', 'Do not daemonise process'){ |x| opts.daemonise = false }
-    o.on('-i', '--interface INTERFACE', 'Listen on the given interface (default is 127.0.0.1)'){|x| opts.interface = x.to_s }
+    o.on('-n', '--daemonise', 'Daemonise process'){ |x| opts.daemonise = false }
+    o.on('-i', '--interface INTERFACE', 'Listen on the given interface (default is 127.0.0.1, set to '' for all)'){|x| opts.interface = x.to_s }
     o.on('-r', '--read-only', 'Disable editing features'){ |x| opts.readonly = true }
     # o.on('-k', '--there-can-be-only-one', 'Only allow one instance (kill if a pid file is found)'){ |x| opts.kill = true }
     o.on('-d', '--directory DIR', 'The directory in which to find content'){ |d| opts.path = d.to_s }
     o.on('-e', '--edit-pw PASSWORD', 'The password to use to prevent editing (insecure without SSL)'){|x| opts.editpass = x.to_s } 
+    o.on('-c', '--no-clean-dirs', 'Leave empty directories when deleting files'){|x| opts.cleandirs = false }
   end
   op.parse!
 
@@ -496,7 +724,7 @@ end
 
 # Simple wiki engine
 class SimpleWikEngine
-  def initialize(path, readonly=false, editpass='', default="Index", blacklist=['.', '..'], extensions=%w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text})
+  def initialize(path, readonly=false, cleandirs=false, editpass='', default="Index", blacklist=['.', '..'], extensions=%w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text})
     @basedir    = path
     @extensions = extensions
     @blacklist = blacklist 
@@ -504,6 +732,7 @@ class SimpleWikEngine
     @readonly = readonly
     @editpass = editpass
     @error = []
+    @cleandirs = cleandirs
   end
 
   # get request
@@ -526,9 +755,9 @@ class SimpleWikEngine
 
     #Check path.  IF it doesn't exist, create it
     path = params['path'][0].to_s 
+    dirname     = (path[-1] == File::SEPARATOR or File.directory?(path)) ? path : File.dirname(path)
     if not File.exist?(path) then
       # Work out the directory and mkdir -p it if it doesn't exist already
-      dirname     = (path[-1] == File::SEPARATOR or File.directory?(path)) ? path : File.dirname(path)
       FileUtils.mkdir_p( dirname )
 
       # if the thing is not a directory, touch it
@@ -543,11 +772,34 @@ class SimpleWikEngine
     fout.write(params['content'][0])
     fout.close
 
+    # Check to see if the user wants the file deleting
+    if params['content'][0] == '' then
+      File.delete(path)
+    
+      # Check if directory is empty and remove
+      if @cleandirs then
+        Pathname.new( dirname ).ascend(){ |d| 
+          if dir_empty?(d)
+            Dir.delete(d)
+          else
+            break
+          end
+        }
+      end
+
+    end
+
     # Then show page
     get(req)
   end
 
   private
+
+  # Test if a directory is empty (nothing but [., ..])
+  def dir_empty?(dir)
+    # thanks to http://www.ruby-forum.com/topic/84762
+    !Dir.foreach(dir) {|n| break true unless /\A\.\.?\z/ =~ n}
+  end
 
   # Add an error to the list, then call get
   # Allows processing of requests half-way through
@@ -652,7 +904,7 @@ end
 
 
 # =============================================================================
-$opts = parse
-Server.serve( $opts.port, $opts.interface, $opts.path, 
-             SimpleWikEngine.new($opts.path, $opts.readonly, $opts.editpass, $opts.default) 
+opts = parse
+Server.serve( opts.port, opts.interface, opts.path, 
+             SimpleWikEngine.new(opts.path, opts.readonly, opts.cleandirs, opts.editpass, opts.default) 
             )
