@@ -12,6 +12,8 @@ require 'cgi' # for escaping only
 require 'fileutils'
 require 'pathname'  # for removing dirs
 
+
+ 
 HEAD_TEMPLATE = %q{
 <html>
   <head>
@@ -257,8 +259,8 @@ HEAD_TEMPLATE = %q{
 EDIT_TEMPLATE = %{
   <% if type == :text and not @readonly %>
     <div id="edit">
-      <form action="" method="POST">
-        <textarea id="editbox" name="content"><%=h File.exist?(path) ? File.read(path) : '' %></textarea>
+      <form action="" method="POST" onsubmit="window.onbeforeunload = null;">
+        <textarea id="editbox" name="content" onchange="window.onbeforeunload = function(e){ return 'Navigating elsewhere may cause you to lose edits.'; }"><%=h File.exist?(path) ? File.read(path) : '' %></textarea>
         <% if @editpass.length > 0 %>
           <label for="pass">Password:</label><input type="password" name="pass" value=""/><br/>
         <% end %>
@@ -659,7 +661,7 @@ def parse
     o.on('-d', '--directory DIR', 'The directory in which to find content'){ |d| opts.path = d.to_s }
     o.on('-e', '--edit-pw PASSWORD', 'The password to use to prevent editing (insecure without SSL)'){|x| opts.editpass = x.to_s } 
     o.on('-c', '--no-clean-dirs', 'Leave empty directories when deleting files'){|x| opts.cleandirs = false }
-    o.on('-f', '--favicon ICON', 'Read favicon from file'){|x| opts.favicon = Base64::encode64( File.open(x, 'rb').read() ) }
+    o.on('-f', '--favicon ICON', 'Read favicon from file'){|x| opts.favicon = File.exist?(x) ? Base64::encode64(File.open(x, 'rb').read()) : nil }
     o.on('-b', '--blacklist REGEX', 'Blacklist a certain regex from file listings (i.e. hidden files, RCS files)'){|x| opts.blacklist << Regexp.new(x) }
   end
   op.parse!
@@ -688,19 +690,11 @@ class Server < WEBrick::HTTPServlet::AbstractServlet
   def do_GET(request, response)
     status, content_type, body, cookies = @engine.get(request)
     return build_response( response, status, cookies, content_type, body )
-  #rescue HTMLError => htmle 
-  #  return htmle.code, 'text/plain', "#{htmle}\n\n#{htmle.backtrace.join("\n")}", {}
-  # rescue Exception => e
-  #   return 500, 'text/plain', "#{e}\n\n#{e.backtrace.join("\n")}", {}
   end
 
   def do_POST(request, response)
     status, content_type, body, cookies = @engine.post(request)
     return build_response( response, status, cookies, content_type, body )
-  # rescue HTMLError => htmle 
-  #   return htmle.code, 'text/plain', "#{htmle}\n\n#{htmle.backtrace.join("\n")}", {}
-  # rescue Exception => e
-  #   return 500, 'text/plain', "#{e}\n\n#{e.backtrace.join("\n")}", {}
   end
 
   private
@@ -822,10 +816,14 @@ class SimpleWikEngine
     return get(req)
   end
 
-  def error(path, msg, code)
-    return code, "text/html", "ERRL #{msg}", {}
+  # Return an error with a given code and message
+  def error(path, code, msg)
+    return code, "text/plain", "Error #{code}: #{msg}\r\nCurrent path: #{path}", {}
   end
 
+  # Consume all errors from the listing.
+  # Called when the page renders to quash any accumulation
+  # of nonfatal error messages.
   def consume_errors()
     @error = []
   end
@@ -842,16 +840,11 @@ class SimpleWikEngine
     end
 
     # Check access to file or directory
-    raise "Could not access path #{path}, though it exists." if File.exists?(path) and not File.readable?(path)
+    # raise "Could not access path #{path}, though it exists." if File.exists?(path) and not File.readable?(path)
+    return error(path, 403, "Could not access path, though it exists (permissions issue?).") if File.exists?(path) and not File.readable?(path)
 
     # Check for default file if path is dir
     return render(req, File.join(path, @default)) if File.directory?(path) 
-      #begin
-      #   
-      #rescue Exception => htmle
-      #  return 200, 'text/html', generate_listing(path), {} if File.directory?(path)
-      #end
-   # end
     
     # Render file if found
     if File.exists?(path)
@@ -864,14 +857,13 @@ class SimpleWikEngine
       return render(req, "#{path}#{e}") if File.exists?("#{path}#{e}") 
     }
 
-      # Apply some heuristics to create some 'blank' edit pages
-      path = "#{path}#{@default}" if  path.to_s[-1] == File::SEPARATOR
-      path = "#{path}#{@extensions[0]}" if not @extensions.include?(File.extname(path))
-      mime, content = render_file(path)
-      return 200, mime, content, {}
-    
-    raise "File not found: #{req.path}"
-    #return 200, 'text/plain', "#{req.path}", {}
+    # Apply some heuristics to create some 'blank' edit pages
+    path = "#{path}#{@default}" if  path.to_s[-1] == File::SEPARATOR
+    path = "#{path}#{@extensions[0]}" if not @extensions.include?(File.extname(path))
+    mime, content = render_file(path)
+    return 200, mime, content, {}
+   
+    return error(path, 404, "File not found!")
   end
 
   def render_file(path)
@@ -892,7 +884,7 @@ class SimpleWikEngine
   end
 
   def render_favicon()
-    return 404, 'text/plain', 'No Favicon' if not @favicon
+    return error("/favicon.ico", 404, 'No Favicon exists') if not @favicon
     return 200, 'image/x-icon', Base64.decode64(@favicon)
   end
 

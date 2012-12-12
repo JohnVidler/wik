@@ -10,7 +10,7 @@ The Wik Model
 -------------
 Pages in Wik are simply text files with an extension that implies that they contain [Markdown](http://daringfireball.net/projects/markdown/) syntax.  Whenever such a file is encountered, it is rendered to screen with some editing options and a nice (and print-compatible) CSS file.  
 
-Wik is *not* focused on editing pages---it has the ability to create and modify text files in a simple manner, but for all major edits it is recommended to use your own editor, directly on the file system.  *Wik is a viewer first, and an editor last*.
+Wik is *not* focused on editing pages---it has the ability to create and modify text files in a simple manner, but for all major edits it is recommended to use your own editor, directly on the file system.  *Wik is a viewer first, and an editor last* (and in the middle it's sort of a wiki).
 
 Wik is single-file.  The aim here is that it can be run in an ad-hoc manner upon any collection of notes that you may have (or even one file).  Think of it as a way of formatting your plaintext files for easy access.
 
