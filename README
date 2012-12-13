@@ -1,0 +1,43 @@
+README
+======
+Wik is a method of viewing and maintaining collections of text notes.
+
+It takes the form of a single-file web server, able to prettily present the content of markdown files as if the underlying folder were a wiki structure.  It's designed to be unobtrusive and run atop existing organisation systems to aid management of projects, studies, and other things you might wish to keep notes about.
+
+Note: if you're viewing this in Wik itself, [More information](sample-content/) is available in the sample content's homepage.
+
+Requirements
+------------
+All requirements are mandatory.
+
+* ruby 1.9 or above, and the gems:
+
+    * markdown
+    * mime-types
+
+Using Wik
+---------
+When launched, Wik displays a web interface on a given port and interface (by default this is `localhost:8080`), where it will display the contents of a folder in a wiki-like way.
+
+To launch Wik and browse this documentation, simply run
+
+    $ ./wik
+
+from the folder with this README file in it, then visit `http://localhost:8080` in your browser.
+
+The default options are designed to be useful in most cases, however, the basic behaviour is somewhat customisable.  Use the `-h` flag to see all of them.
+
+Todo
+----
+There's a few things that would be useful, but break the single-file philosophy too much.  They may be implemented one day (and if you do any, please send me a patch!):
+
+* SSL support---would make the password-to-edit feature more useful, but requires certificate specification and there's no easy way to roll them into the file:
+* Markdown highlighting in browser---Again, hard to inline without sending colossal, overwrought pages.  All Javascript and CSS gracefully degrades, so adding complexity may make that goal harder.
+* The ability to launch a browser window automatically using xdg-open---would be useful to create an integrated "run and use" style application, but is easy to script due to the magnificence of the UNIX model.
+* The ability to launch an external editor from the browser using some kind of url scheme---I should look into this.
+
+Known Bugs
+----------
+None (but I didn't look very hard)
+
+If you find any, please report them to <stephenwattam@gmail.com>

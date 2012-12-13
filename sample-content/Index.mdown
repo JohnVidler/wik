@@ -1,25 +1,32 @@
 Home
 ====
 
-Welcome to the home page of your new *Wik* installation.
+Welcome to Wik, the wiki that isn't entirely feature-complete.
 
-Wik is designed to be a simple way of viewing (and quickly tweaking) collections of notes and files in order to manage a project.  It was developed for the purposes of maintaining many studies in [Stephen Wattam](http://stephenwattam.com)'s PhD, and is best suited to fast-changing documents that are not necessarily edited through the web interface.
-
+Wik is a simple way to view and maintain collections of notes made in text/markdown format.  It consists of a single-file server and wiki engine that can manage content with minimal fuss.
 
 The Wik Model
 -------------
-Pages in Wik are simply text files with an extension that implies that they contain [Markdown](http://daringfireball.net/projects/markdown/) syntax.  Whenever such a file is encountered, it is rendered to screen with some editing options and a nice (and print-compatible) CSS file.  
+When Wik is run, it starts serving a given directory to the web---most files are rendered as any other server would, except for those which look like they contain [Markdown](http://daringfireball.net/projects/markdown/).  Markdown files are rendered nicely using print-compatible CSS.
 
-Wik is *not* focused on editing pages---it has the ability to create and modify text files in a simple manner, but for all major edits it is recommended to use your own editor, directly on the file system.  *Wik is a viewer first, and an editor last* (and in the middle it's sort of a wiki).
+The idea behind this is that it's possible, and easy, to run wik in a folder full of quick notes about something---the editing features help you form a coherent set of notes, but ultimately they are still useful when viewed (and edited) offline.  Wik is designed as a viewer and maintainer, rather than a full, integrated (and thus restrictive) wiki system.
 
-Wik is single-file.  The aim here is that it can be run in an ad-hoc manner upon any collection of notes that you may have (or even one file).  Think of it as a way of formatting your plaintext files for easy access.
+Wik is designed to be simple to run, with parsimonious default settings, so that you can launch it whenever you'd like to view some notes.  It's not designed for multi-user, versioned or complex data, and deliberately does *not* support:
+
+* Page versioning (use an RCS)
+* Access control (use a reverse proxy)
+* Media management/upload (use a file system)
+* Advanced editing (use vim)
+
+Wik's features exist to make managing the above easier, rather than to force you to do all the work in the browser.  Pair it with [uzbl](http://www.uzbl.org/) for a more integrated app.
+
 
 Requirements
 ------------
-Wik uses [ruby](http://www.ruby-lang.org/en/), and requires a couple of gems to run:
+Wik is written in [ruby](http://www.ruby-lang.org/en/) 1.9, and requires a couple of gems to run:
 
-    1. markdown---Used to render all the markdown content
-    2. mime-types---used to serve non-markdown content with an informed MIME type (vital for images and other documents)
+1. markdown---Used to render all the markdown content
+2. mime-types---used to serve non-markdown content with an informed MIME type (vital for images and other documents)
 
 Wik Guide
 ---------
@@ -45,9 +52,9 @@ Anything that is not markdown is simply rendered straight through, meaning it's 
 #### Browsing
 Wik's interface is incredibly simple:
 
-    * The banner includes the filename (left) and a list of directories within the current level (right);
-    * The footer includes the mtime for the current file;
-    * The bit in the middle is your content.
+* The banner includes the filename (left) and a list of directories within the current level (right);
+* The footer includes the mtime for the current file;
+* The bit in the middle is your content.
 
 The editing box is a textarea.  Can't get much simpler than that.  If a password is required to edit files, a field will be displayed to enter it just beneath the content.
 
@@ -56,12 +63,12 @@ Folders may be browsed using the links to the right hand side of the header, but
 
 Wik works somewhat like a wiki---to create a page simply visit it.  Wik will apply the following rules when visiting pages:
 
-    1. If the file exists, it will be returned with a best-guess MIME type (and rendered nicely if it seems to be markdown);
-    2. If the path is a directory, the default file name will be appended
-    3. If no markdown file exists with the default name, Wik will present an editing page for that file (or a directory listing if editing is turned off).
+1. If the file exists, it will be returned with a best-guess MIME type (and rendered nicely if it seems to be markdown);
+2. If the path is a directory, the default file name will be appended
+3. If no markdown file exists with the default name, Wik will present an editing page for that file (or a directory listing if editing is turned off).
 
 Wik uses a list of extensions to determine which files are markdown files, and uses the `mime-types` gem to determine MIME type for most other files.  When creating a new file, it will use the first item in the extensions list.
 
 Note that, when creating files, Wik operates like `mkdir -p`, and will create a `/very/very/very/deep/file/tree/very/easily`.  
 
-Wik will delete a file if you edit it to contain no content (not even a single solitary space), and clean up all empty folders down to that level---if your folder structure is important, you can stop it by using the `-c` flag.
+Wik will delete a file if you edit it to contain no content (not even a single solitary space), and clean up all empty folders down to that level---if your folder structure is important, you can stop it from doing this by using the `-c` flag.
