@@ -300,18 +300,27 @@ END_TEMPLATE = %{
 
 
 DIR_TEMPLATE= %{
-    <h2>Directories</h2>
-    <ul>
-    <% dirs.each{|c| %>
-      <li><a href="<%=h c%><%= File.directory?(File.join(basedir, c)) ? '/' : ''%>"/><%=h c%></a></li>
-    <%}%>
-    </ul>
-    <h2>Files</h2>
-    <ul>
-    <% files.each{|c| %>
-      <li><a href="<%=h c%>"/><%=h c%></a></li>
-    <%}%>
-    </ul>
+    <% if dirs.length == 0 and files.length == 0 %>
+    <p>This directory is empty!</p>
+    <% end %>
+
+    <% if dirs.length > 0 %>
+      <h2>Directories</h2>
+      <ul>
+      <% dirs.each{|c| %>
+        <li><a href="<%=h c%><%= File.directory?(File.join(basedir, c)) ? '/' : ''%>"/><%=h c%></a></li>
+      <%}%>
+      </ul>
+    <% end %>
+
+    <% if files.length > 0 %>
+      <h2>Files</h2>
+      <ul>
+      <% files.each{|c| %>
+        <li><a href="<%=h c%>"/><%=h c%></a></li>
+      <%}%>
+      </ul>
+    <% end %>
 } 
 
 PAGE_TEMPLATE= HEAD_TEMPLATE + %{
@@ -326,13 +335,13 @@ PAGE_TEMPLATE= HEAD_TEMPLATE + %{
     <% end %>
 } + END_TEMPLATE
 
-MISSING_TEMPLATE = HEAD_TEMPLATE + %{
+MISSING_TEMPLATE = HEAD_TEMPLATE + DIR_TEMPLATE + %{
   <% if not readonly? %>
+    <hr/>
     <h2>Create Page: <%=h title%></h2>
 } + EDIT_TEMPLATE + %{
-  <hr/>
   <% end %>
-} + DIR_TEMPLATE + FOOT_TEMPLATE + END_TEMPLATE
+} + FOOT_TEMPLATE + END_TEMPLATE
 
 FAVICON = "AAABAAMAICEAAAEAIAAsEQAANgAAABAaAAABACAAEAcAAGIRAAAwOQAAAQAgALAsAAByGAAAKAAA
 ACAAAABCAAAAAQAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
@@ -722,6 +731,7 @@ class Server < WEBrick::HTTPServlet::AbstractServlet
     cookies.each{ |k,v|         response.cookies << "#{k}=#{v}" }
     response['Content-Type']  = content_type || 'text/plain'
     response.body             = body || ''
+    response['Cache-control'] = "no-cache"
 
     return response
   end
