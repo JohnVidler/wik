@@ -43,15 +43,12 @@ HEAD_TEMPLATE = %q{
 
       div#menu{
         padding: 0 0.2em;
-      }
-
-      div#menu{
         text-align: right;
         float: right;
+        font-size: smaller;
       }
 
       div#menu a{
-        font-size: smaller;
         text-decoration: none;
         color: blue;
       }
@@ -241,7 +238,11 @@ HEAD_TEMPLATE = %q{
         <% if File.absolute_path(basedir) != File.absolute_path(@basedir) %>
         <a href="../">[&larr;]</a>
         <% end %>
-        <%= dirs.map{|c|
+        [<%=files.length%>f, <%=dirs.length%>d]
+        <%# dirs.map{|c|
+          c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}/</a>"
+        }.join(", ") %>
+        <%# files.delete_if{|f| not @extensions.include?(File.extname(f))}.map{|c|
           c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}</a>"
         }.join(", ") %>
       </div>
@@ -327,7 +328,7 @@ PAGE_TEMPLATE= HEAD_TEMPLATE + %{
 
 MISSING_TEMPLATE = HEAD_TEMPLATE + %{
   <% if not readonly? %>
-    <h2>Editing Page: <%=h title%></h2>
+    <h2>Create Page: <%=h title%></h2>
 } + EDIT_TEMPLATE + %{
   <hr/>
   <% end %>
