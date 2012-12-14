@@ -738,17 +738,7 @@ class Server < WEBrick::HTTPServlet::AbstractServlet
 end
 
 
-class HTMLError < Exception 
-  attr_reader :code
-
-  def initialize(msg, code)
-    super(msg)
-    @code = code
-  end
-
-end
-
-# Simple wiki engine
+# Simple wik engine
 class SimpleWikEngine
   def initialize(path, 
                  cleandirs=false,
@@ -758,6 +748,8 @@ class SimpleWikEngine
                  blacklist=[/^\.\.?$/],
                  extensions=%w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text}, 
                  favicon=nil)
+
+    # Config
     @basedir      = path
     @cleandirs    = cleandirs
     @editmethods  = editmethods
@@ -767,6 +759,7 @@ class SimpleWikEngine
     @extensions   = extensions.map{|x| ".#{x}"}
     @favicon      = favicon
 
+    # State
     @error        = []
   end
 
@@ -860,10 +853,28 @@ class SimpleWikEngine
     @error = []
   end
 
-  def render(req, override_path=nil)
-    # Build path
-    path = override_path || File.join( @basedir, req.path )
+  def find_file(path)
+    path = File.join(@basedir, path)
 
+    # Return if the file exists
+    return path if File.exists?(path) and not File.directory?(path)
+
+    # else add default
+    path = "#{path}#{@default}"       if path.to_s[-1] == File::SEPARATOR
+
+    # Check for all possible extensions and recurse if found
+    @extensions.each{ |e|
+      return "#{path}#{e}" if File.exists?("#{path}#{e}") and not File.directory?("#{path}#{e}")
+    }
+
+    # and, if not found, return default
+    path = "#{path}#{@extensions[0]}" if not @extensions.include?(File.extname(path))
+
+    # return path
+    return path
+  end
+
+  def render(req)
     # Render favicon
     # avoid the correct MIME 'type image/vnd.microsoft.icon' because it doesn't work in ie
     if req.path == '/favicon.ico'
@@ -871,37 +882,31 @@ class SimpleWikEngine
       return code, mime, icon, {}
     end
 
-    # Check access to file or directory
-    # raise "Could not access path #{path}, though it exists." if File.exists?(path) and not File.readable?(path)
-    return error(path, 403, "Could not access path, though it exists (permissions issue?).") if File.exists?(path) and not File.readable?(path)
 
-    # Check for default file if path is dir
-    return render(req, File.join(path, @default)) if File.directory?(path) 
-    
+    # Build path
+    path = find_file(req.path)
+
+    # Check access to file or directory
+    return error(path, 403, "Could not access path, though it exists (permissions issue?).") if File.exist?(path) and not File.readable?(path)
+
     # Render file if found
+    mime, content = nil, nil
     if File.exists?(path)
       mime, content = render_file(path)
-      return 200, mime, content, {} 
+    else
+      mime, content = render_create(path)
     end
+    return 200, mime, content, {} 
 
-    # Check for all possible extensions and recurse if found
-    @extensions.each{ |e|
-      return render(req, "#{path}#{e}") if File.exists?("#{path}#{e}") 
-    }
-
-    # Apply some heuristics to create some 'blank' edit pages
-    path = "#{path}#{@default}" if  path.to_s[-1] == File::SEPARATOR
-    path = "#{path}#{@extensions[0]}" if not @extensions.include?(File.extname(path))
-    mime, content = render_file(path)
-    return 200, mime, content, {}
-   
     return error(path, 404, "File not found!")
   end
 
-  def render_file(path)
+  def render_create(path)
     # Return blank edit page if no file exists
     return "text/html; charset=UTF-8", compose_template(MISSING_TEMPLATE, File.basename(path), File.dirname(path), MIME::Types['text/plain'], path, '', :text) if not File.exist?(path) #and not @readonly 
+  end
 
+  def render_file(path)
     # render if markdown by extension or mime
     mime = MIME::Types.type_for(path)
     markdown_extension = @extensions.map{|e| File.extname(path).downcase == e }.include?(true)
