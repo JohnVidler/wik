@@ -13,6 +13,31 @@ require 'fileutils'
 require 'pathname'  # for removing dirs
 
 
+
+DIR_TEMPLATE= %{
+    <% if dirs.length == 0 and files.length == 0 %>
+    <p>This directory is empty!</p>
+    <% end %>
+
+    <% if (dirs.length > 0) %>
+      <h2>Directories</h2>
+      <ul>
+      <% dirs.each{|c| %>
+        <li><a href="<%=h c%><%= File.directory?(File.join(basedir, c)) ? '/' : ''%>"/><%=h c%></a></li>
+      <%}%>
+      </ul>
+    <% end %>
+
+    <% if files.length > 0 %>
+      <h2>Files</h2>
+      <ul>
+      <% files.each{|c| %>
+        <li><a href="<%=h c%>"/><%=h c%></a></li>
+      <%}%>
+      </ul>
+    <% end %>
+} 
+
  
 HEAD_TEMPLATE = %q{
 <html>
@@ -74,24 +99,29 @@ HEAD_TEMPLATE = %q{
         width: 100%;
       }
       
-      div#hide_edit div#edit{
-        display: none;
+      div#edit input, div#edit textarea{
+        border: solid 1px #777;
+        padding: 0.4em 0.8em;
+        margin: 1em;
+        background: transparent;
       }
 
-      div#hide_edit:hover div#edit{
+      div#edit input{
+        box-shadow: 1px 1px 5px #888;
+        background-color: #ddd;
+      }
+
+      div#edit input:focus, div#edit input:hover, div#edit textarea:focus{
+        background-color: white;
+      }
+
+      div#hide_edit div#prompt_stick a{
         display: block;
+        width: 100%;
       }
 
-      div#hide_edit:hover span#prompt{
+      div#hide_edit div#edit, div#hide_edit:hover div#prompt, div#hide_edit div#prompt_stick, div#ddmenu_inner{
         display: none;
-      }
-      
-      div#hide_edit span#prompt_stick{
-        display: none;
-      }
-
-      div#hide_edit:hover span#prompt_stick{
-        display: inline;
       }
 
       div#edit{
@@ -120,6 +150,54 @@ HEAD_TEMPLATE = %q{
         list-style-type: none;
         padding: 0.1em;
         margin: 0.1em;
+      }
+
+      div#ddmenu{
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        padding: 0.2em;
+        margin: 0;
+        background: white;
+      }
+
+      div#ddmenu:hover{
+        border-right: solid 2px #777;
+        border-bottom: solid 2px #777;
+        box-shadow: 1px 1px 5px #aaa;
+      }
+
+      div#ddmenu:hover span#prompt_menu{
+        display: none;
+      }
+
+      div#ddmenu_inner h2{
+        font-size: 1em;
+        margin: 0.1em;
+        padding: 0.1em;
+        line-height: 1em;
+        border-bottom: solid 1px #777;
+      }
+
+      div#ddmenu_inner ul{
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        list-style-type: none;
+      }
+      
+      div#ddmenu_inner ul li a{
+        display: block;
+        width: 100%;
+      }
+
+      div#ddmenu_inner ul li{
+        padding: 0 0.4em;
+      }
+      
+      div#hide_edit:hover div#prompt_stick, div#hide_edit:hover div#edit, div#ddmenu:hover div#ddmenu_inner, div#ddmenu_inner :hover{
+        display: block;
       }
 
       /* ------------ Main content styling ---------------- */
@@ -226,7 +304,7 @@ HEAD_TEMPLATE = %q{
         @page :right { margin: 15mm 10mm 15mm 20mm; }
         p, h2, h3 { orphans: 3; widows: 3; }
         h2, h3 { page-break-after: avoid; }
-        div#banner, div#hide_edit{ display: none;}
+        div#banner, div#hide_edit, div#ddmenu{ display: none;}
       }
 
     </style>
@@ -235,19 +313,42 @@ HEAD_TEMPLATE = %q{
   <body>
     <div id="banner">
       <div id="menu">
-        <% if File.absolute_path(basedir) != File.absolute_path(@basedir) %>
-        <a href="../">[&larr;]</a>
-        <% end %>
-        [<%=files.length%>f, <%=dirs.length%>d]
-        <%# dirs.map{|c|
-          c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}/</a>"
-        }.join(", ") %>
-        <%# files.delete_if{|f| not @extensions.include?(File.extname(f))}.map{|c|
-          c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}</a>"
-        }.join(", ") %>
+
+       
+        <% @header_info.each\{|h| 
+              case h
+              when :counts %>
+                [<%=files.length%>f, <%=dirs.length - (dirs.include?('..') ? 1 : 0)%>d]
+           <% when :words %>
+                [<%= content.split(/\w+/).count %>w]
+           <% when :files %>
+                [<%= files.delete_if{|f| not @extensions.include?(File.extname(f))}.map{|c|
+                  c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}</a>"
+                }.join(", ") %>]
+           <% when :dirs %> 
+                [<%=dirs.map{|c|
+                  c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}/</a>"
+                }.join(", ") %>]
+           <% when :up %> 
+                <% if File.absolute_path(basedir) != File.absolute_path(@basedir) %>
+                  [<a href="../">&larr;</a>]
+                <% end %>
+           <% when :menu %> 
+           <% end
+        \}
+        %>
+
       </div>
       <h1><%= title %></h1>
+      
     </div>
+      <% if @menu %>
+        <div id="ddmenu"><span id="prompt_menu">[menu]</span>
+          <div id="ddmenu_inner">
+            } + DIR_TEMPLATE + %q{
+          </div>
+        </div>
+      <% end %>
 
     <!-- error listing -->
     <% if @error.length > 0 %>
@@ -274,10 +375,10 @@ EDIT_TEMPLATE = %{
         <form action="" method="POST" onsubmit="window.onbeforeunload = null;">
           <textarea id="editbox" name="content" onchange="window.onbeforeunload = function(e){ return 'Navigating elsewhere may cause you to lose edits.'; }"><%=h File.exist?(path) ? File.read(path) : '' %></textarea>
           <% if @editpass.length > 0 %>
-            <label for="pass">Password:</label><input type="password" name="pass" value=""/><br/>
+            <label for="pass">Password:</label><input type="password" name="pass" value=""/>
           <% end %>
           <input type="hidden" value="<%=h path%>" name="path"/>
-          <input type="reset" value="Reset"/>
+          <!--<input type="reset" value="Reset"/>-->
           <input type="submit" value="Edit <%=h title%>"/>
         </form>
       <% end %>
@@ -298,38 +399,13 @@ END_TEMPLATE = %{
 </html>
 }
 
-
-DIR_TEMPLATE= %{
-    <% if dirs.length == 0 and files.length == 0 %>
-    <p>This directory is empty!</p>
-    <% end %>
-
-    <% if dirs.length > 0 %>
-      <h2>Directories</h2>
-      <ul>
-      <% dirs.each{|c| %>
-        <li><a href="<%=h c%><%= File.directory?(File.join(basedir, c)) ? '/' : ''%>"/><%=h c%></a></li>
-      <%}%>
-      </ul>
-    <% end %>
-
-    <% if files.length > 0 %>
-      <h2>Files</h2>
-      <ul>
-      <% files.each{|c| %>
-        <li><a href="<%=h c%>"/><%=h c%></a></li>
-      <%}%>
-      </ul>
-    <% end %>
-} 
-
 PAGE_TEMPLATE= HEAD_TEMPLATE + %{
     <%= content %>
 } + FOOT_TEMPLATE + %{
     <% if not readonly? %>
       <div id="hide_edit">
-        <span id="prompt">Hover to show edit options.</span>
-        <span id="prompt_stick" onclick="javascript:{document.getElementById('prompt_stick').style.display = 'none'; document.getElementById('prompt').style.display = 'none'; document.getElementById('edit').style.display = 'block';};">Click to pin edit box.</span>
+        <div id="prompt">Hover to show edit options.</div>
+        <div id="prompt_stick"><a href="javascript:{document.getElementById('prompt_stick').style.display = 'none'; document.getElementById('prompt').style.display = 'none'; document.getElementById('edit').style.display = 'block';};">Click to pin edit box.</a></div>
 } + EDIT_TEMPLATE + %{
       </div>
     <% end %>
@@ -672,6 +748,8 @@ def parse
   opts.extensions = %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text} 
   opts.blacklist  = []
   opts.editmethods = [:form]
+  opts.header_info = [:up, :counts, :words]
+  opts.menu       = true
 
   op = OptionParser.new do |o|
     o.on('-i', '--interface INTERFACE', 'Listen on the given interface (default is 127.0.0.1, set to '' for all)'){|x| opts.interface = x.to_s; opts.editmethods.delete(:extern) }
@@ -680,6 +758,7 @@ def parse
     o.on('-r', '--read-only', 'Disable editing features'){ |x| opts.editmethods = [] }
     o.on('-x', '--external-editing', 'Enable external edit links (disabled if interface is not \'127.0.0.1\')'){|x| opts.editmethods << :extern if opts.interface == '127.0.0.1' }
     o.on('-w', '--no-web-editing', 'Disable web edit box'){|x| opts.editmethods.delete(:form) }
+    o.on('-m', '--no-menu', 'Disable menu'){|x| opts.menu = false }
 
     # o.on('-k', '--there-can-be-only-one', 'Only allow one instance (kill if a pid file is found)'){ |x| opts.kill = true }
     o.on('-d', '--directory DIR', 'The directory in which to find content'){ |d| opts.path = d.to_s }
@@ -740,24 +819,18 @@ end
 
 # Simple wik engine
 class SimpleWikEngine
-  def initialize(path, 
-                 cleandirs=false,
-                 editmethods=[:extern, :form],
-                 editpass='', 
-                 default="Index", 
-                 blacklist=[/^\.\.?$/],
-                 extensions=%w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text}, 
-                 favicon=nil)
-
-    # Config
+  def initialize(path, o = {} )
     @basedir      = path
-    @cleandirs    = cleandirs
-    @editmethods  = editmethods
-    @editpass     = editpass
-    @default      = default
-    @blacklist    = blacklist 
-    @extensions   = extensions.map{|x| ".#{x}"}
-    @favicon      = favicon
+    @cleandirs    = o[:cleandirs]   || false
+    @editmethods  = o[:editmethods] || [:extern, :from]
+    @editpass     = o[:editpass]    || ''
+    @default      = o[:default]     || "Index"
+    @blacklist    = o[:blacklist]   || [/^\.\.?$/]
+    @extensions   = o[:extensions]  || %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text}
+    @extensions.map!{|x| ".#{x}"}
+    @favicon      = o[:favicon]     || FAVICON
+    @header_info  = o[:header_info] || [:up, :counts, :words, :files, :dirs]
+    @menu         = o[:menu] 
 
     # State
     @error        = []
@@ -940,6 +1013,11 @@ class SimpleWikEngine
       end
     } if File.exist?( basedir )
 
+    dirs << '..' if File.absolute_path(basedir) != File.absolute_path(@basedir) 
+
+    dirs.sort!
+    files.sort!
+
     return ERB.new(template).result(binding)
   end
 
@@ -961,12 +1039,16 @@ end
 
 Server.serve( opts.port, opts.interface, opts.path, 
              SimpleWikEngine.new(opts.path, 
-                                 opts.cleandirs, 
-                                 opts.editmethods,
-                                 opts.editpass, 
-                                 opts.default, 
-                                 [/^\.\.?$/] + opts.blacklist, 
-                                 opts.extensions, 
-                                 opts.favicon) 
+                                 {:cleandirs => opts.cleandirs, 
+                                  :editmethods => opts.editmethods,
+                                  :editpass => opts.editpass, 
+                                  :default => opts.default, 
+                                  :blacklist => [/^\.\.?$/] + opts.blacklist, 
+                                  :extensions => opts.extensions, 
+                                  :favicon => opts.favicon,
+                                  :header_info => opts.header_info,
+                                  :menu => opts.menu
+                                  }
+                                 ) 
             )
   
