@@ -11,7 +11,7 @@ require 'erb'
 require 'cgi' # for escaping only
 require 'fileutils'
 require 'pathname'  # for removing dirs
-
+require 'yaml'  # for config loading
 
 
 DIR_TEMPLATE= %{
@@ -731,26 +731,24 @@ AP/wP+J//wAA//C/43//AAD/8J/jv/8AAP/4z+Pf/wAA//jP49//AAD/+Ofj7/8AAP/4c+P3/wAA
 ////AAD///////8AAP///////wAA////////AAD///////8AAP///////wAA////////AAD/////
 //8AAP///////wAA////////AAD///////8AAA=="
 
-
+DEFAULT_OPTIONS               = OpenStruct.new
+DEFAULT_OPTIONS.daemonise     = false 
+DEFAULT_OPTIONS.interface     = "127.0.0.1"
+DEFAULT_OPTIONS.port          = 8080
+DEFAULT_OPTIONS.path          = "./"
+DEFAULT_OPTIONS.default       = 'Index'
+DEFAULT_OPTIONS.editpass      = ''
+DEFAULT_OPTIONS.cleandirs     = true 
+DEFAULT_OPTIONS.favicon       = FAVICON
+DEFAULT_OPTIONS.extensions    = %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text} 
+DEFAULT_OPTIONS.blacklist     = []
+DEFAULT_OPTIONS.editmethods   = [:form]
+DEFAULT_OPTIONS.header_info   = [:up, :counts, :words]
+DEFAULT_OPTIONS.menu          = true
+DEFAULT_OPTIONS.browser       = nil
 
 # Parse command-line options.
-def parse
-  # Set up defaults
-  opts            = OpenStruct.new
-  opts.daemonise  = false 
-  opts.interface  = "127.0.0.1"
-  opts.port       = 8080
-  opts.path       = "./"
-  opts.default    = 'Index'
-  opts.editpass   = ''
-  opts.cleandirs  = true 
-  opts.favicon    = FAVICON
-  opts.extensions = %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text} 
-  opts.blacklist  = []
-  opts.editmethods = [:form]
-  opts.header_info = [:up, :counts, :words]
-  opts.menu       = true
-
+def parse(opts)
   op = OptionParser.new do |o|
     o.on('-i', '--interface INTERFACE', 'Listen on the given interface (default is 127.0.0.1, set to '' for all)'){|x| opts.interface = x.to_s; opts.editmethods.delete(:extern) }
     o.on('-p', '--port PORT', 'Port to listen on'){ |x| opts.port = x.to_i }
@@ -768,8 +766,24 @@ def parse
     o.on('-c', '--no-clean-dirs', 'Leave empty directories when deleting blank files'){|x| opts.cleandirs = false }
     o.on('-f', '--favicon ICON', 'Read favicon from file'){|x| opts.favicon = File.exist?(x) ? Base64::encode64(File.open(x, 'rb').read()) : nil }
     o.on('-b', '--blacklist REGEX', 'Blacklist a certain regex from file listings (i.e. hidden files, RCS files)'){|x| opts.blacklist << Regexp.new(x) }
+
+    o.on('-B', '--browser CMD', 'Browser command to launch after starting (quits when browser process ends)'){|x| opts.browser = x }
   end
   op.parse!
+
+  return opts
+end
+
+def load_from_file(filename, opts)
+  return opts if not File.exist?(filename) or not File.readable?(filename)
+
+  # Load and check format
+  file_opts = YAML.load(File.read(filename))
+  raise "Incorrect options format (YAML hash is needed!)" if not file_opts.is_a? Hash
+
+  file_opts.each{|k, v|
+    eval("opts.#{k.to_s}=v")
+  }
 
   return opts
 end
@@ -779,7 +793,7 @@ class Server < WEBrick::HTTPServlet::AbstractServlet
   def self.serve(port, bind=nil, local_resource_path="", engine=nil)
     server = WEBrick::HTTPServer.new(:Port        => port, 
                                      :BindAddress => bind)
-
+    server.unmount("/")
     # server.mount("/#{resources}",     WEBrick::HTTPServlet::FileHandler, local_resource_path, {:FancyIndexing => false})
     server.mount("/", Server, {:engine => engine})
 
@@ -892,7 +906,7 @@ class SimpleWikEngine
     end
 
     # Then show page
-    get(req)
+    render(req)
   end
 
   private
@@ -911,7 +925,7 @@ class SimpleWikEngine
   # Allows processing of requests half-way through
   def nonfatal(req, msg)
     @error << msg
-    return get(req)
+    return render(req)
   end
 
   # Return an error with a given code and message
@@ -1029,14 +1043,31 @@ end
 
 
 # =============================================================================
-opts = parse
+# Parse options with increasing 'clobberiness'
+opts = DEFAULT_OPTIONS
+opts = load_from_file("/etc/wikrc", opts)
+opts = load_from_file(File.join(Dir.home, ".wikrc"), opts)
+opts = parse(opts)
 
+# Fork to the background if people request
 if opts.daemonise then
   puts "Forking to background..."
   Process.daemon(true) 
 end
 
+# If a browser is given, launch it in a thread, and
+# wait for it to close
+# when it closes, signal the current process to die, thereby closing the
+# server
+if opts.browser
+  pid = Process.pid
+  fork do
+    `#{opts.browser} "http://#{opts.interface}:#{opts.port}"`
+    Process.kill("HUP", pid);
+  end
+end
 
+# Start the server serving, with various options from the opts opt
 Server.serve( opts.port, opts.interface, opts.path, 
              SimpleWikEngine.new(opts.path, 
                                  {:cleandirs => opts.cleandirs, 

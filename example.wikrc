@@ -1,0 +1,88 @@
+---
+# Wik Example Config
+# ------------------
+# This file is valid YAML, and represents
+# a Hash object to Ruby.
+# Values given below are defaults.
+#
+# Should wik detach from the terminal?
+daemonise     : false 
+
+# The interface on which to listen, as a string
+interface     : "127.0.0.1"
+
+# The port on which to listen
+port          : 8080
+
+# The path to expose as a wiki.
+path          : "./"
+
+# The default page name (will be appended to 
+# new pages in directories)
+default       : 'Index'
+
+# The password needed to edit.  Blank to disable
+# the feature.  Note that without HTTPS this 
+# is not terribly secure.
+editpass      : ''
+
+# Remove empty directories when deleting a file
+# within a deep path?  Set to false if your 
+# directory structure is deliberately full
+# of empty dirs
+cleandirs     : true 
+
+# The favicon.  This is a nice 'w' by default,
+# loaded internally.
+favicon       : nil 
+
+# Extensions to seek and label as markdown.
+#
+# When creating new pages, Wik will use the first
+# item in this list as part of the filename.
+extensions    : 
+  - markdown 
+  - mdown 
+  - mkdn 
+  - md 
+  - mkd 
+  - mdwn 
+  - mdtxt 
+  - mdtext 
+  - text 
+
+# Don't list these files in the directory listing.
+# This is an ARRAY of Regexes.
+blacklist     : []
+
+# Methods allowed to edit.  This is an array of:
+#   :form   --- Allow editing via a web form
+#   :extern --- provide a link to launch an editor
+#
+# Note that :extern is disabled if a non-localhost
+# interface is selected, because edit links are
+# useless on other machines.
+editmethods   :
+  - :form
+
+# Info provided in the banner at the top.  An array of:
+#   :up       --- A link up a dir (if not at root)
+#   :counts   --- Counts of files/dirs in the current dir
+#   :words    --- Word count for the current document
+#   :files    --- A list of files (with links)
+#   :dirs     --- A list of dirs (with links)
+#
+# Items will appear in the order specified, right-left.
+header_info   : 
+  - :up
+  - :counts
+  - :words
+
+# Enable the drop-down menu (contains file and dir links)
+menu          : true
+
+# Launch a browser command.  Wik will close after the 
+# process finishes.
+#
+# Pair with uzbl for a more integrated desktop wiki experience.
+browser       : nil

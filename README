@@ -25,7 +25,15 @@ To launch Wik and browse this documentation, simply run
 
 from the folder with this README file in it, then visit `http://localhost:8080` in your browser.
 
-The default options are designed to be useful in most cases, however, the basic behaviour is somewhat customisable.  Use the `-h` flag to see all of them.
+### Configuration
+
+The default options are designed to be useful in most cases, however, the basic behaviour is somewhat customisable.  When starting, Wik will consider the following config files (each level clobbers those above):
+ 
+ 1. `/etc/wikrc`
+ 2. `~/.wikrc`
+ 3. Command-line options (use `-h` to list them)
+
+Configuration files should be written in YAML as a hash of key-value pairs.  Configuration files can override more options than are available on the command-line, and they're listed in the (commented) [example config](example.wikrc).
 
 Todo
 ----
