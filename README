@@ -2,7 +2,7 @@ README
 ======
 Wik is a method of viewing and maintaining collections of text notes.
 
-It takes the form of a single-file web server, able to prettily present the content of markdown files as if the underlying folder were a wiki structure.  It's designed to be unobtrusive and run atop existing organisation systems to aid management of projects, studies, and other things you might wish to keep notes about.
+It takes the form of a single-file web server and wiki, able to prettily present the content of markdown files as if the underlying folder were a wiki structure.  It's designed to be unobtrusive and run atop existing organisation systems to aid management of projects, studies, and other things you might wish to keep notes about.
 
 Note: if you're viewing this in Wik itself, [More information](sample-content/) is available in the sample content's homepage.
 

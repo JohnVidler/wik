@@ -351,17 +351,16 @@ HEAD_TEMPLATE = %q{
       <% end %>
 
     <!-- error listing -->
-    <% if @error.length > 0 %>
+    <% if msgs.length > 0 %>
       <div id="errors">
         <span id="click_hide" onclick="javascript:document.getElementById('errors').style.display='none';">click to hide</span>
         <ul>
-          <% @error.each{|e| %>
+          <% msgs.each{|e| %>
             <li><%=h e%></li>
           <% } %>
         </ul>
       </div>
-    <% end 
-    consume_errors %>
+    <% end %>
 }
 
 EDIT_TEMPLATE = %{
@@ -845,9 +844,6 @@ class SimpleWikEngine
     @favicon      = o[:favicon]     || FAVICON
     @header_info  = o[:header_info] || [:up, :counts, :words, :files, :dirs]
     @menu         = o[:menu] 
-
-    # State
-    @error        = []
   end
 
   # get request
@@ -857,16 +853,16 @@ class SimpleWikEngine
 
   # Post request, don't do anything special for now.
   def post(req)
-    return nonfatal(req, "Wik is in read-only mode") if readonly?
-    return nonfatal(req, "Form-based editing is disabled") if not @editmethods.include?(:form)
+    return render(req, ["Wik is in read-only mode"]) if readonly?
+    return render(req, ["Form-based editing is disabled"]) if not @editmethods.include?(:form)
 
     params = CGI::parse(req.body)
 
     # Handle any parameters
     # First check we have both content and path
-    return nonfatal(req, "Wrong parameters to POST Request")  if not params.keys.include?('content') and params.keys.include?('path')
-    return nonfatal(req, "No password supplied!")             if @editpass.length > 0 and not params.keys.include?('pass')
-    return nonfatal(req, "Wrong password!")                   if @editpass.length > 0 and @editpass != params['pass'][0].to_s
+    return render(req, ["Wrong parameters to POST Request"])  if not params.keys.include?('content') and params.keys.include?('path')
+    return render(req, ["No password supplied!"])             if @editpass.length > 0 and not params.keys.include?('pass')
+    return render(req, ["Wrong password!"])                   if @editpass.length > 0 and @editpass != params['pass'][0].to_s
   
 
     #Check path.  IF it doesn't exist, create it
@@ -879,8 +875,8 @@ class SimpleWikEngine
       # if the thing is not a directory, touch it
       FileUtils.touch(path) if path[-1] != File::SEPARATOR
     end
-    return nonfatal(req, "Cannot write to that path, as it is a directory!") if File.directory?(path)
-    return nonfatal(req, "Permission denied trying to write to #{path}") if not File.writable?(path)
+    return render(req, ["Cannot write to that path, as it is a directory!"]) if File.directory?(path)
+    return render(req, ["Permission denied trying to write to #{path}"]) if not File.writable?(path)
     # here the file pointed to at path should be writable and present
 
     # write data
@@ -924,20 +920,12 @@ class SimpleWikEngine
   # Add an error to the list, then call get
   # Allows processing of requests half-way through
   def nonfatal(req, msg)
-    @error << msg
-    return render(req)
+    return render(req, [msg])
   end
 
   # Return an error with a given code and message
   def error(path, code, msg)
     return code, "text/plain", "Error #{code}: #{msg}\r\nCurrent path: #{path}", {}
-  end
-
-  # Consume all errors from the listing.
-  # Called when the page renders to quash any accumulation
-  # of nonfatal error messages.
-  def consume_errors()
-    @error = []
   end
 
   def find_file(path)
@@ -961,7 +949,7 @@ class SimpleWikEngine
     return path
   end
 
-  def render(req)
+  def render(req, msgs=[])
     # Render favicon
     # avoid the correct MIME 'type image/vnd.microsoft.icon' because it doesn't work in ie
     if req.path == '/favicon.ico'
@@ -979,27 +967,27 @@ class SimpleWikEngine
     # Render file if found
     mime, content = nil, nil
     if File.exists?(path)
-      mime, content = render_file(path)
+      mime, content = render_file(path, msgs)
     else
-      mime, content = render_create(path)
+      mime, content = render_create(path, msgs)
     end
     return 200, mime, content, {} 
 
     return error(path, 404, "File not found!")
   end
 
-  def render_create(path)
+  def render_create(path, msgs=[])
     # Return blank edit page if no file exists
-    return "text/html; charset=UTF-8", compose_template(MISSING_TEMPLATE, File.basename(path), File.dirname(path), MIME::Types['text/plain'], path, '', :text) if not File.exist?(path) #and not @readonly 
+    return "text/html; charset=UTF-8", compose_template(MISSING_TEMPLATE, File.basename(path), File.dirname(path), MIME::Types['text/plain'], path, '', msgs, :text) if not File.exist?(path) #and not @readonly 
   end
 
-  def render_file(path)
+  def render_file(path, msgs=[])
     # render if markdown by extension or mime
     mime = MIME::Types.type_for(path)
     markdown_extension = @extensions.map{|e| File.extname(path).downcase == e }.include?(true)
     if markdown_extension or mime.include?(MIME::Types['text/plain'][0])
       content = Markdown.new( File.read(path) ).to_html 
-      return 'text/html; charset=UTF-8', compose_template( PAGE_TEMPLATE, File.basename(path), File.dirname(path), mime[0], path, content, :text )
+      return 'text/html; charset=UTF-8', compose_template( PAGE_TEMPLATE, File.basename(path), File.dirname(path), mime[0], path, content, msgs, :text )
     end
     
     # else simply output the content raw (for binary types, html, etc)
@@ -1012,7 +1000,7 @@ class SimpleWikEngine
     return 200, 'image/x-icon', Base64.decode64(@favicon)
   end
 
-  def compose_template(template, title, pwd, mime, path, content, type=:text)
+  def compose_template(template, title, pwd, mime, path, content, msgs=[], type=:text)
     # make local dir listing, with directories at the beginning
     dirs    = []
     files   = []
