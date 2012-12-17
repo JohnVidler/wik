@@ -32,9 +32,8 @@ editpass      : ''
 # of empty dirs
 cleandirs     : true 
 
-# The favicon.  This is a nice 'w' by default,
-# loaded internally.
-favicon       : nil 
+# The favicon.  This loaded internally by default
+favicon       :  
 
 # Extensions to seek and label as markdown.
 #
@@ -85,4 +84,7 @@ menu          : true
 # process finishes.
 #
 # Pair with uzbl for a more integrated desktop wiki experience.
-browser       : nil
+browser       : 
+
+# CSS file to load and use (default is internal)
+css           : 

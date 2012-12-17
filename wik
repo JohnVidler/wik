@@ -1,22 +1,33 @@
 #!/usr/bin/env ruby
 
-require 'webrick'
-require 'ostruct'
-require 'optparse'
-require 'logger'
-require 'base64'
-require 'markdown'
-require 'mime/types'
-require 'erb'
-require 'cgi' # for escaping only
-require 'fileutils'
-require 'pathname'  # for removing dirs
-require 'yaml'  # for config loading
+require 'webrick'       # server
+require 'ostruct'       # command line options
+require 'optparse'      # command line options
+require 'logger'        # webrick
+require 'base64'        # favicon storage
+require 'markdown'      # text rendering
+require 'mime/types'    # serving of unknown files
+require 'erb'           # template management
+require 'cgi'           # for escaping only
+require 'fileutils'     # removing directories/files
+require 'pathname'      # for removing dirs
+require 'yaml'          # for config loading
 
 
 DIR_TEMPLATE= %{
     <% if dirs.length == 0 and files.length == 0 %>
     <p>This directory is empty!</p>
+    <% end %>
+
+    <% if pages.length > 0 %>
+      <h2>Pages</h2>
+      <ul>
+      <% pages.each{|c| 
+        page_name = File.basename(c)[0..-(File.extname(c).length+1)]
+        %>
+        <li><a href="<%=h c%>"/><%=h page_name%></a></li>
+      <%}%>
+      </ul>
     <% end %>
 
     <% if (dirs.length > 0) %>
@@ -38,14 +49,7 @@ DIR_TEMPLATE= %{
     <% end %>
 } 
 
- 
-HEAD_TEMPLATE = %q{
-<html>
-  <head>
-    <title><%=h title %> -- Wik</title>
-    <meta charset="UTF-8">
-
-    <style type="text/css">
+CSS = %q{
       div#banner{
         width: 100%;
         border-bottom: solid 2px #333;
@@ -190,6 +194,7 @@ HEAD_TEMPLATE = %q{
       div#ddmenu_inner ul li a{
         display: block;
         width: 100%;
+        font-size: smaller;
       }
 
       div#ddmenu_inner ul li{
@@ -307,6 +312,16 @@ HEAD_TEMPLATE = %q{
         div#banner, div#hide_edit, div#ddmenu{ display: none;}
       }
 
+}
+ 
+HEAD_TEMPLATE = %q{
+<html>
+  <head>
+    <title><%=h title %> -- Wik</title>
+    <meta charset="UTF-8">
+
+    <style type="text/css">
+      <%=@css%>
     </style>
 
   </head>
@@ -318,7 +333,7 @@ HEAD_TEMPLATE = %q{
         <% @header_info.each\{|h| 
               case h
               when :counts %>
-                [<%=files.length%>f, <%=dirs.length - (dirs.include?('..') ? 1 : 0)%>d]
+                [<%=pages.length%>p, <%=files.length%>f, <%=dirs.length - (dirs.include?('..') ? 1 : 0)%>d]
            <% when :words %>
                 [<%= content.split(/\w+/).count %>w]
            <% when :files %>
@@ -745,6 +760,7 @@ DEFAULT_OPTIONS.editmethods   = [:form]
 DEFAULT_OPTIONS.header_info   = [:up, :counts, :words]
 DEFAULT_OPTIONS.menu          = true
 DEFAULT_OPTIONS.browser       = nil
+DEFAULT_OPTIONS.css           = CSS
 
 # Parse command-line options.
 def parse(opts)
@@ -781,7 +797,16 @@ def load_from_file(filename, opts)
   raise "Incorrect options format (YAML hash is needed!)" if not file_opts.is_a? Hash
 
   file_opts.each{|k, v|
-    eval("opts.#{k.to_s}=v")
+    eval("opts.#{k.to_s}=#{
+      case k.to_s
+        when 'css'
+          File.read(v)
+        when 'blacklist'
+          v.map{|x| Regexp.new(x) if not x.is_a? Regexp}
+        else
+          v
+      end
+    }")
   }
 
   return opts
@@ -844,6 +869,7 @@ class SimpleWikEngine
     @favicon      = o[:favicon]     || FAVICON
     @header_info  = o[:header_info] || [:up, :counts, :words, :files, :dirs]
     @menu         = o[:menu] 
+    @css          = o[:css]         || CSS
   end
 
   # get request
@@ -1003,12 +1029,15 @@ class SimpleWikEngine
   def compose_template(template, title, pwd, mime, path, content, msgs=[], type=:text)
     # make local dir listing, with directories at the beginning
     dirs    = []
+    pages   = []
     files   = []
     basedir = File.directory?(path) ? path : File.dirname(path)
     Dir.foreach( basedir ){|d| 
       if true != @blacklist.each{|b| break true if (d.to_s =~ b) }
         if File.directory?(File.join(basedir, d))
           dirs << d
+        elsif @extensions.include?( File.extname(d).downcase )
+          pages << d
         else
           files << d
         end
@@ -1017,6 +1046,7 @@ class SimpleWikEngine
 
     dirs << '..' if File.absolute_path(basedir) != File.absolute_path(@basedir) 
 
+    pages.sort!
     dirs.sort!
     files.sort!
 
@@ -1058,15 +1088,16 @@ end
 # Start the server serving, with various options from the opts opt
 Server.serve( opts.port, opts.interface, opts.path, 
              SimpleWikEngine.new(opts.path, 
-                                 {:cleandirs => opts.cleandirs, 
-                                  :editmethods => opts.editmethods,
-                                  :editpass => opts.editpass, 
-                                  :default => opts.default, 
-                                  :blacklist => [/^\.\.?$/] + opts.blacklist, 
-                                  :extensions => opts.extensions, 
-                                  :favicon => opts.favicon,
-                                  :header_info => opts.header_info,
-                                  :menu => opts.menu
+                                 {:cleandirs    => opts.cleandirs, 
+                                  :editmethods  => opts.editmethods,
+                                  :editpass     => opts.editpass, 
+                                  :default      => opts.default, 
+                                  :blacklist    => [/^\.\.?$/] + opts.blacklist, 
+                                  :extensions   => opts.extensions, 
+                                  :favicon      => opts.favicon,
+                                  :header_info  => opts.header_info,
+                                  :menu         => opts.menu,
+                                  :css          => opts.css
                                   }
                                  ) 
             )
