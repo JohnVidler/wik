@@ -61,14 +61,36 @@ The editing box is a textarea.  Can't get much simpler than that.  If a password
 #### File Layout & Organisation
 Folders may be browsed using the links to the right hand side of the header, but these are there for convenience only---the main method of navigation is intended to be wiki-style: create links and then follow them.  
 
-Wik works somewhat like a wiki---to create a page simply visit it.  Wik will apply the following rules when visiting pages:
+Wik works a little like a wiki:
 
-1. If the file exists, it will be returned with a best-guess MIME type (and rendered nicely if it seems to be markdown);
-2. If the path is a directory, the default file name will be appended
-3. If no markdown file exists with the default name, Wik will present an editing page for that file (or a directory listing if editing is turned off).
+##### Viewing/Editing Pages
+Simply visit the relative path from the document root to access a page, i.e. `http://localhost:8080/path/to/page/`
 
-Wik uses a list of extensions to determine which files are markdown files, and uses the `mime-types` gem to determine MIME type for most other files.  When creating a new file, it will use the first item in the extensions list.
+Wik uses a series of rules to find pages, so:
 
-Note that, when creating files, Wik operates like `mkdir -p`, and will create a `/very/very/very/deep/file/tree/very/easily`.  
+ 1. If the path is a directory, it will look for the default page name (`Index` by default)
+ 2. If the page is a file that doesn't exist, it will append all of the known markdown extensions, looking for a markdown file
+ 3. If it can't find any pages using those methods, it will prompt you to create a page, and offer a directory listing.
 
-Wik will delete a file if you edit it to contain no content (not even a single solitary space), and clean up all empty folders down to that level---if your folder structure is important, you can stop it from doing this by using the `-c` flag.
+This lets you refer to the file `/root/Index.markdown` in three ways:
+
+ * `/root/`
+ * `/root/Index`
+ * `/root/Index.markdown`
+
+##### Creating Pages
+To create a page, simply visit one that doesn't exist yet and edit it.  Note that the same redirection rules apply as above.
+
+
+##### Deleting Pages
+To delete a page, remove all content from the edit box and submit.  Wik will detect your blank response and remove the file.
+
+##### Managing Files (images, etc)
+If file uploads are enabled, you can use the form to upload files.  These can either be markdown pages or things like images.
+
+To delete a file, simply type its name in the filename box and submit without selecting a file to upload.  This will find and remove the file selected.
+
+This feature can be disabled by disabling form-based editing, and will respond to the edit password option.
+
+##### Directory Removal
+When deleting the last file in a directory, Wik will also remove the directory (this can be disabled in the options if desired).  It will recurse up the directory tree, cleaning out any old dirs it finds.

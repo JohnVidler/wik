@@ -41,8 +41,6 @@ There's a few things that would be useful, but break the single-file philosophy 
 
 * SSL support---would make the password-to-edit feature more useful, but requires certificate specification and there's no easy way to roll them into the file:
 * Markdown highlighting in browser---Again, hard to inline without sending colossal, overwrought pages.  All Javascript and CSS gracefully degrades, so adding complexity may make that goal harder.
-* The ability to launch a browser window automatically using xdg-open---would be useful to create an integrated "run and use" style application, but is easy to script due to the magnificence of the UNIX model.
-* The ability to launch an external editor from the browser using some kind of url scheme---I should look into this.
 
 Known Bugs
 ----------

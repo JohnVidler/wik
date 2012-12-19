@@ -88,3 +88,6 @@ browser       :
 
 # CSS file to load and use (default is internal)
 css           : 
+
+# Allow file uploads (and deletion)?
+allow_upload  : false

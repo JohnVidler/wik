@@ -15,10 +15,6 @@ require 'yaml'          # for config loading
 
 
 DIR_TEMPLATE= %{
-    <% if dirs.length == 0 and files.length == 0 %>
-    <p>This directory is empty!</p>
-    <% end %>
-
     <% if pages.length > 0 %>
       <h2>Pages</h2>
       <ul>
@@ -103,19 +99,21 @@ CSS = %q{
         width: 100%;
       }
       
-      div#edit input, div#edit textarea{
+      div#edit input, div#edit textarea, div#upload input{
         border: solid 1px #777;
         padding: 0.4em 0.8em;
         margin: 1em;
         background: transparent;
       }
 
-      div#edit input{
+      div#edit input, div#upload input{
         box-shadow: 1px 1px 5px #888;
         background-color: #ddd;
       }
 
-      div#edit input:focus, div#edit input:hover, div#edit textarea:focus{
+      div#edit input:focus, div#edit input:hover, div#edit textarea:focus,
+      div#upload input:focus, div#upload input:hover, div#upload textarea:focus
+      {
         background-color: white;
       }
 
@@ -124,11 +122,11 @@ CSS = %q{
         width: 100%;
       }
 
-      div#hide_edit div#edit, div#hide_edit:hover div#prompt, div#hide_edit div#prompt_stick, div#ddmenu_inner{
+      div#hide_edit div#show_edit, div#hide_edit:hover div#prompt, div#hide_edit div#prompt_stick, div#ddmenu_inner{
         display: none;
       }
 
-      div#edit{
+      div#edit, div#upload{
         padding: 1em 0;
         text-align: center;
       }
@@ -201,7 +199,7 @@ CSS = %q{
         padding: 0 0.4em;
       }
       
-      div#hide_edit:hover div#prompt_stick, div#hide_edit:hover div#edit, div#ddmenu:hover div#ddmenu_inner, div#ddmenu_inner :hover{
+      div#hide_edit:hover div#show_edit, div#hide_edit:hover div#prompt_stick, div#hide_edit:hover div#upload, div#hide_edit:hover div#edit, div#ddmenu:hover div#ddmenu_inner, div#ddmenu_inner :hover{
         display: block;
       }
 
@@ -211,14 +209,14 @@ CSS = %q{
       html { font-size: 100%; overflow-y: scroll; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
 
       body{
-      color:#444;
-      font-family:Georgia, Palatino, 'Palatino Linotype', Times, 'Times New Roman', serif;
-      font-size:12px;
-      line-height:1.5em;
-      padding:1em;
-      margin:auto;
-      max-width:42em;
-      background:#fefefe;
+        color:#444;
+        font-family:Georgia, Palatino, 'Palatino Linotype', Times, 'Times New Roman', serif;
+        font-size:12px;
+        line-height:1.5em;
+        padding:1em;
+        margin:auto;
+        max-width:42em;
+        background:#fefefe;
       }
 
       a{ color: #0645ad; text-decoration:none;}
@@ -228,24 +226,34 @@ CSS = %q{
       a:focus{ outline: thin dotted; }
       a:hover, a:active{ outline: 0; }
 
-      ::-moz-selection{background:rgba(255,255,0,0.3);color:#000}
-      ::selection{background:rgba(255,255,0,0.3);color:#000}
+      /* a[href$=".pdf"]:after { content: " [PDF]"; }
+      a[href^="http://"]:after { content: "*"; }
+      a[href$="https://"]:after { content: "*"; }
+      a[href$="ftp://"]:after { content: " [ftp]"; } */
+
+      ::-moz-selection{
+        background:rgba(255,255,0,0.3);color:#000
+      }
+      ::selection{
+        background:rgba(255,255,0,0.3);color:#000
+      }
 
       a::-moz-selection{background:rgba(255,255,0,0.3);color:#0645ad}
       a::selection{background:rgba(255,255,0,0.3);color:#0645ad}
 
       p{
       margin:1em 0;
+
       }
 
       img{
-      max-width:100%;
+        max-width:100%;
       }
 
       h1,h2,h3,h4,h5,h6{
-      font-weight:normal;
-      color:#111;
-      line-height:1em;
+        font-weight:normal;
+        color:#111;
+        line-height:1em;
       }
       h4,h5,h6{ font-weight: bold; }
       h1{ font-size:2.5em; }
@@ -256,10 +264,10 @@ CSS = %q{
       h6{ font-size:0.9em; }
 
       blockquote{
-      color:#666666;
-      margin:0;
-      padding-left: 3em;
-      border-left: 0.5em #EEE solid;
+        color:#666666;
+        margin:0;
+        padding-left: 3em;
+        border-left: 0.5em #EEE solid;
       }
       hr { display: block; height: 2px; border: 0; border-top: 1px solid #aaa;border-bottom: 1px solid #eee; margin: 1em 0; padding: 0; }
       pre, code, kbd, samp { color: #000; font-family: monospace, monospace; _font-family: 'courier new', monospace; font-size: 0.98em; }
@@ -287,29 +295,32 @@ CSS = %q{
       td { vertical-align: top; }
 
       @media only screen and (min-width: 480px) {
-      body{font-size:14px;}
+        body{font-size:14px;}
       }
 
       @media only screen and (min-width: 768px) {
-      body{font-size:16px;}
+        body{font-size:16px;}
       }
 
       @media print {
         * { background: transparent !important; color: black !important; filter:none !important; -ms-filter: none !important; }
-        body{font-size:12pt; max-width:100%;}
-        a, a:visited { text-decoration: underline; }
+        p{  text-align:justify; text-justify:inter-word; }
+        body{font-size:10pt; max-width:100%;}
+        a, a:visited { text-decoration: none; border-bottom: dotted 1px #777;}
         hr { height: 1px; border:0; border-bottom:1px solid black; }
-        a[href]:after { content: " (" attr(href) ")"; }
+        /* a[href]:after { content: " (" attr(href) ")"; } */
         abbr[title]:after { content: " (" attr(title) ")"; }
         .ir a:after, a[href^="javascript:"]:after, a[href^="#"]:after { content: ""; }
         pre, blockquote { border: 1px solid #999; padding-right: 1em; page-break-inside: avoid; }
         tr, img { page-break-inside: avoid; }
         img { max-width: 100% !important; }
-        @page :left { margin: 15mm 20mm 15mm 10mm; }
-        @page :right { margin: 15mm 10mm 15mm 20mm; }
+        @page { margin: 15mm 25mm 20mm; }
+        /*@page :left { margin: 15mm 20mm 15mm 10mm; }
+        @page :right { margin: 15mm 10mm 15mm 20mm; }*/
         p, h2, h3 { orphans: 3; widows: 3; }
         h2, h3 { page-break-after: avoid; }
         div#banner, div#hide_edit, div#ddmenu{ display: none;}
+        em{ font-weight: bold; }
       }
 
 }
@@ -335,7 +346,7 @@ HEAD_TEMPLATE = %q{
               when :counts %>
                 [<%=pages.length%>p, <%=files.length%>f, <%=dirs.length - (dirs.include?('..') ? 1 : 0)%>d]
            <% when :words %>
-                [<%= content.split(/\w+/).count %>w]
+                [<%= File.exist?(path) ? File.read(path).split(/\w+/).count : '-' %>w]
            <% when :files %>
                 [<%= files.delete_if{|f| not @extensions.include?(File.extname(f))}.map{|c|
                   c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}</a>"
@@ -400,6 +411,30 @@ EDIT_TEMPLATE = %{
   <% end %>
 }
 
+UPLOAD_TEMPLATE = %q{
+  <% if @allow_upload and @editmethods.include?(:form) %>
+    <div id="upload">
+      <form enctype="multipart/form-data" action="" method="POST">
+        <label for="file">File:</label> 
+        <input name="file" id="file" onchange="javascript:{document.getElementById('filename').value = this.value.match(/[^\/\\\\]+$/);};" type="file" /><br/>
+
+        <label for="filename">Filename:</label>
+        <input id="filename" type="text" name="filename" value="" />
+
+        <input id="clobber" type="checkbox" name="clobber" value="yes" />
+        <label for="clobber">overwrite?</label><br/>
+
+        <input type="hidden" value="<%=h basedir%>" name="dir"/>
+        <% if @editpass.length > 0 %>
+          <label for="pass">Password:</label><input type="password" name="pass" value=""/>
+        <% end %>
+        <input type="submit" value="Upload File" />
+      </form>
+    </div>
+  <% end %>
+
+}
+
 FOOT_TEMPLATE = %{
     <div id="footer">
       <% if File.exist?(path) %>
@@ -419,8 +454,14 @@ PAGE_TEMPLATE= HEAD_TEMPLATE + %{
     <% if not readonly? %>
       <div id="hide_edit">
         <div id="prompt">Hover to show edit options.</div>
-        <div id="prompt_stick"><a href="javascript:{document.getElementById('prompt_stick').style.display = 'none'; document.getElementById('prompt').style.display = 'none'; document.getElementById('edit').style.display = 'block';};">Click to pin edit box.</a></div>
+        <div id="prompt_stick"><a href="javascript:{document.getElementById('prompt_stick').style.display = 'none'; document.getElementById('prompt').style.display = 'none'; document.getElementById('show_edit').style.display = 'block';};">Click to pin edit box.</a></div>
+        <div id="show_edit">
 } + EDIT_TEMPLATE + %{
+        <% if @allow_upload %>
+          <hr/>
+} + UPLOAD_TEMPLATE + %{
+        <% end %>
+        </div>
       </div>
     <% end %>
 } + END_TEMPLATE
@@ -430,7 +471,13 @@ MISSING_TEMPLATE = HEAD_TEMPLATE + DIR_TEMPLATE + %{
     <hr/>
     <h2>Create Page: <%=h title%></h2>
 } + EDIT_TEMPLATE + %{
+  <% end 
+  if @allow_upload %>
+    <hr/>
+    <h2>Upload File</h2>
+} + UPLOAD_TEMPLATE + %{
   <% end %>
+
 } + FOOT_TEMPLATE + END_TEMPLATE
 
 FAVICON = "AAABAAMAICEAAAEAIAAsEQAANgAAABAaAAABACAAEAcAAGIRAAAwOQAAAQAgALAsAAByGAAAKAAA
@@ -761,6 +808,7 @@ DEFAULT_OPTIONS.header_info   = [:up, :counts, :words]
 DEFAULT_OPTIONS.menu          = true
 DEFAULT_OPTIONS.browser       = nil
 DEFAULT_OPTIONS.css           = CSS
+DEFAULT_OPTIONS.allow_upload  = false
 
 # Parse command-line options.
 def parse(opts)
@@ -772,6 +820,7 @@ def parse(opts)
     o.on('-x', '--external-editing', 'Enable external edit links (disabled if interface is not \'127.0.0.1\')'){|x| opts.editmethods << :extern if opts.interface == '127.0.0.1' }
     o.on('-w', '--no-web-editing', 'Disable web edit box'){|x| opts.editmethods.delete(:form) }
     o.on('-m', '--no-menu', 'Disable menu'){|x| opts.menu = false }
+    o.on('-u', '--uploads', 'Allow file uploads'){|x| opts.allow_upload = true }
 
     # o.on('-k', '--there-can-be-only-one', 'Only allow one instance (kill if a pid file is found)'){ |x| opts.kill = true }
     o.on('-d', '--directory DIR', 'The directory in which to find content'){ |d| opts.path = d.to_s }
@@ -859,17 +908,18 @@ end
 class SimpleWikEngine
   def initialize(path, o = {} )
     @basedir      = path
-    @cleandirs    = o[:cleandirs]   || false
-    @editmethods  = o[:editmethods] || [:extern, :from]
-    @editpass     = o[:editpass]    || ''
-    @default      = o[:default]     || "Index"
-    @blacklist    = o[:blacklist]   || [/^\.\.?$/]
-    @extensions   = o[:extensions]  || %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text}
+    @cleandirs    = o[:cleandirs]     || false
+    @editmethods  = o[:editmethods]   || [:extern, :from]
+    @editpass     = o[:editpass]      || ''
+    @default      = o[:default]       || "Index"
+    @blacklist    = o[:blacklist]     || [/^\.\.?$/]
+    @extensions   = o[:extensions]    || %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text}
     @extensions.map!{|x| ".#{x}"}
-    @favicon      = o[:favicon]     || FAVICON
-    @header_info  = o[:header_info] || [:up, :counts, :words, :files, :dirs]
+    @favicon      = o[:favicon]       || FAVICON
+    @header_info  = o[:header_info]   || [:up, :counts, :words, :files, :dirs]
     @menu         = o[:menu] 
-    @css          = o[:css]         || CSS
+    @css          = o[:css]           || CSS
+    @allow_upload = o[:allow_upload]  
   end
 
   # get request
@@ -882,18 +932,80 @@ class SimpleWikEngine
     return render(req, ["Wik is in read-only mode"]) if readonly?
     return render(req, ["Form-based editing is disabled"]) if not @editmethods.include?(:form)
 
-    params = CGI::parse(req.body)
+    params = req.query
 
     # Handle any parameters
-    # First check we have both content and path
-    return render(req, ["Wrong parameters to POST Request"])  if not params.keys.include?('content') and params.keys.include?('path')
+    # First check we have the correct password, if required
     return render(req, ["No password supplied!"])             if @editpass.length > 0 and not params.keys.include?('pass')
-    return render(req, ["Wrong password!"])                   if @editpass.length > 0 and @editpass != params['pass'][0].to_s
+    return render(req, ["Wrong password!"])                   if @editpass.length > 0 and @editpass != params['pass'].to_s
+ 
+    # Check params and try doing stuff.  Prioritise editing.
+    return edit_page(req)   if not %w{content path}.map{|p| params.keys.include?(p) }.include?(false)
+    return upload_file(req) if not %w{file filename dir}.map{|p| params.keys.include?(p) }.include?(false) and @allow_upload
+    # return delete_file(req) if not %w{filename deleteconfirm}.map{|p| params.keys.include?(p) }.include?(false) and @allow_delete
   
+    # Error if nothing else returns
+    return render(req, ["Cannot do anything with those POST parameters."]) 
+  end
 
+  private
+
+  def edit_page(req)
+    params = req.query
     #Check path.  IF it doesn't exist, create it
-    path = params['path'][0].to_s 
-    dirname     = (path[-1] == File::SEPARATOR or File.directory?(path)) ? path : File.dirname(path)
+    path = params['path'].to_s 
+    ensure_path_exists(path)
+    return render(req, ["Cannot edit that path, as it is a directory!"])  if File.directory?(path)
+    return render(req, ["Permission denied trying to write to #{path}"])  if not File.writable?(path)
+    # here the file pointed to at path should be writable and present
+
+    # write data
+    fout = File.open(path, 'w')
+    fout.write(params['content'])
+    fout.close
+
+    # Check to see if the user wants the file deleting
+    if params['content'] == '' then
+      File.delete(path)
+      dir_cleanup(path) 
+    end
+  
+    render(req)
+  end
+
+  def upload_file(req)
+    params = req.query
+    filename = File.join(@basedir, params['dir'], params['filename'])
+    
+    # check permissions and file forms.
+    return render(req, ["Cannot write to that path, it\'s a directory!"]) if File.directory?(filename)
+    return render(req, ["Permission denied for #{filename}"])             if File.exist?(filename) and not File.writable?(filename)
+
+    # Check if the user wants us to clobber things.
+    return render(req, ["File already exists, and I was not instructed to overwrite it."]) if File.exists?(filename) and not params['clobber'] == "yes"
+
+    # Remove file if no file contents given (requires clobber, checked above)
+    if( File.exists?(filename) and params['file'].length == 0 )
+      File.delete(filename)
+      dir_cleanup(File.join(@basedir, params['dir']))
+    else
+      ensure_path_exists(filename)
+      fout = File.open(filename, 'wb')
+      fout.write(params['file'])
+      fout.close
+    end
+
+    render(req)
+  end
+
+  # Get dirname from path
+  def dirname_from_path(path)
+    (path[-1] == File::SEPARATOR or File.directory?(path)) ? path : File.dirname(path)
+  end
+
+  # Create directories like mkdir -p if they don't exist
+  def ensure_path_exists(path)
+    dirname     = dirname_from_path(path)
     if not File.exist?(path) then
       # Work out the directory and mkdir -p it if it doesn't exist already
       FileUtils.mkdir_p( dirname )
@@ -901,37 +1013,22 @@ class SimpleWikEngine
       # if the thing is not a directory, touch it
       FileUtils.touch(path) if path[-1] != File::SEPARATOR
     end
-    return render(req, ["Cannot write to that path, as it is a directory!"]) if File.directory?(path)
-    return render(req, ["Permission denied trying to write to #{path}"]) if not File.writable?(path)
-    # here the file pointed to at path should be writable and present
-
-    # write data
-    fout = File.open(path, 'w')
-    fout.write(params['content'][0])
-    fout.close
-
-    # Check to see if the user wants the file deleting
-    if params['content'][0] == '' then
-      File.delete(path)
-    
-      # Check if directory is empty and remove
-      if @cleandirs then
-        Pathname.new( dirname ).ascend(){ |d| 
-          if dir_empty?(d)
-            Dir.delete(d)
-          else
-            break
-          end
-        }
-      end
-
-    end
-
-    # Then show page
-    render(req)
   end
 
-  private
+  # Recursively ascend and clean up dirs
+  def dir_cleanup(path)
+    dirname     = dirname_from_path(path)
+    # Check if directory is empty and remove
+    if @cleandirs then
+      Pathname.new( dirname ).ascend(){ |d| 
+        if dir_empty?(d)
+          Dir.delete(d)
+        else
+          break
+        end
+      }
+    end
+  end
 
   def readonly?
     @editmethods.length == 0
@@ -1011,7 +1108,7 @@ class SimpleWikEngine
     # render if markdown by extension or mime
     mime = MIME::Types.type_for(path)
     markdown_extension = @extensions.map{|e| File.extname(path).downcase == e }.include?(true)
-    if markdown_extension or mime.include?(MIME::Types['text/plain'][0])
+    if markdown_extension or mime[0] == MIME::Types['text/plain'][0]
       content = Markdown.new( File.read(path) ).to_html 
       return 'text/html; charset=UTF-8', compose_template( PAGE_TEMPLATE, File.basename(path), File.dirname(path), mime[0], path, content, msgs, :text )
     end
@@ -1097,7 +1194,8 @@ Server.serve( opts.port, opts.interface, opts.path,
                                   :favicon      => opts.favicon,
                                   :header_info  => opts.header_info,
                                   :menu         => opts.menu,
-                                  :css          => opts.css
+                                  :css          => opts.css,
+                                  :allow_upload => opts.allow_upload
                                   }
                                  ) 
             )
