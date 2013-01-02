@@ -438,7 +438,7 @@ UPLOAD_TEMPLATE = %q{
 FOOT_TEMPLATE = %{
     <div id="footer">
       <% if File.exist?(path) %>
-        Last edited: <%= File.mtime(path) %>
+        Last edited <%= File.mtime(path).strftime(@date_format) %>
       <% end %>
     </div>
 }
@@ -809,29 +809,28 @@ DEFAULT_OPTIONS.menu          = true
 DEFAULT_OPTIONS.browser       = nil
 DEFAULT_OPTIONS.css           = CSS
 DEFAULT_OPTIONS.allow_upload  = false
+DEFAULT_OPTIONS.date_format   = "%d %b %Y, %H:%M"
+DEFAULT_OPTIONS.config_file   = nil
 
 # Parse command-line options.
 def parse(opts)
   op = OptionParser.new do |o|
     o.on('-i', '--interface INTERFACE', 'Listen on the given interface (default is 127.0.0.1, set to '' for all)'){|x| opts.interface = x.to_s; opts.editmethods.delete(:extern) }
-    o.on('-p', '--port PORT', 'Port to listen on'){ |x| opts.port = x.to_i }
-    o.on('-n', '--daemonise', 'Daemonise process'){ |x| opts.daemonise = true }
-    o.on('-r', '--read-only', 'Disable editing features'){ |x| opts.editmethods = [] }
-    o.on('-x', '--external-editing', 'Enable external edit links (disabled if interface is not \'127.0.0.1\')'){|x| opts.editmethods << :extern if opts.interface == '127.0.0.1' }
-    o.on('-w', '--no-web-editing', 'Disable web edit box'){|x| opts.editmethods.delete(:form) }
-    o.on('-m', '--no-menu', 'Disable menu'){|x| opts.menu = false }
-    o.on('-u', '--uploads', 'Allow file uploads'){|x| opts.allow_upload = true }
-
-    # o.on('-k', '--there-can-be-only-one', 'Only allow one instance (kill if a pid file is found)'){ |x| opts.kill = true }
-    o.on('-d', '--directory DIR', 'The directory in which to find content'){ |d| opts.path = d.to_s }
-    o.on('-D', '--default INDEX', 'Index page name'){ |x| opts.default = x.to_s }
-
-    o.on('-e', '--edit-pw PASSWORD', 'The password to use to prevent editing (insecure without SSL)'){|x| opts.editpass = x.to_s } 
-    o.on('-c', '--no-clean-dirs', 'Leave empty directories when deleting blank files'){|x| opts.cleandirs = false }
-    o.on('-f', '--favicon ICON', 'Read favicon from file'){|x| opts.favicon = File.exist?(x) ? Base64::encode64(File.open(x, 'rb').read()) : nil }
-    o.on('-b', '--blacklist REGEX', 'Blacklist a certain regex from file listings (i.e. hidden files, RCS files)'){|x| opts.blacklist << Regexp.new(x) }
-
-    o.on('-B', '--browser CMD', 'Browser command to launch after starting (quits when browser process ends)'){|x| opts.browser = x }
+    o.on('-p', '--port PORT',           'Port to listen on'){ |x| opts.port = x.to_i }
+    o.on('-n', '--daemonise',           'Daemonise process'){ |x| opts.daemonise = true }
+    o.on('-r', '--read-only',           'Disable editing features'){ |x| opts.editmethods = [] }
+    o.on('-x', '--external-editing',    'Enable external edit links (disabled if interface is not \'127.0.0.1\')'){|x| opts.editmethods << :extern if opts.interface == '127.0.0.1' }
+    o.on('-w', '--no-web-editing',      'Disable web edit box'){|x| opts.editmethods.delete(:form) }
+    o.on('-m', '--no-menu',             'Disable menu'){|x| opts.menu = false }
+    o.on('-u', '--uploads',             'Allow file uploads'){|x| opts.allow_upload = true }
+    o.on('-d', '--directory DIR',       'The directory in which to find content'){ |d| opts.path = d.to_s }
+    o.on('-D', '--default INDEX',       'Index page name'){ |x| opts.default = x.to_s }
+    o.on('-e', '--edit-pw PASSWORD',    'The password to use to prevent editing (insecure without SSL)'){|x| opts.editpass = x.to_s } 
+    o.on('-C', '--no-clean-dirs',       'Leave empty directories when deleting blank files'){|x| opts.cleandirs = false }
+    o.on('-f', '--favicon ICON',        'Read favicon from file'){|x| opts.favicon = File.exist?(x) ? Base64::encode64(File.open(x, 'rb').read()) : nil }
+    o.on('-b', '--blacklist REGEX',     'Blacklist a certain regex from file listings (i.e. hidden files, RCS files)'){|x| opts.blacklist << Regexp.new(x) }
+    o.on('-B', '--browser CMD',         'Browser command to launch after starting (quits when browser process ends)'){|x| opts.browser = x }
+    o.on('-c', '--config FILE',         'Read configuration from the given file'){|x| opts.config_file = x if File.exists?(x) }
   end
   op.parse!
 
@@ -919,7 +918,8 @@ class SimpleWikEngine
     @header_info  = o[:header_info]   || [:up, :counts, :words, :files, :dirs]
     @menu         = o[:menu] 
     @css          = o[:css]           || CSS
-    @allow_upload = o[:allow_upload]  
+    @allow_upload = o[:allow_upload] 
+    @date_format  = o[:date_format]   || "%d %b %Y, %H:%M"
   end
 
   # get request
@@ -1163,6 +1163,7 @@ opts = DEFAULT_OPTIONS
 opts = load_from_file("/etc/wikrc", opts)
 opts = load_from_file(File.join(Dir.home, ".wikrc"), opts)
 opts = parse(opts)
+opts = load_from_file(opts.config_file, opts) if opts.config_file
 
 # Fork to the background if people request
 if opts.daemonise then
@@ -1195,7 +1196,8 @@ Server.serve( opts.port, opts.interface, opts.path,
                                   :header_info  => opts.header_info,
                                   :menu         => opts.menu,
                                   :css          => opts.css,
-                                  :allow_upload => opts.allow_upload
+                                  :allow_upload => opts.allow_upload,
+                                  :date_format  => opts.date_format
                                   }
                                  ) 
             )

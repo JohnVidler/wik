@@ -91,3 +91,15 @@ css           :
 
 # Allow file uploads (and deletion)?
 allow_upload  : false
+
+# Date format following 'last edited' text in footer
+#
+# This is ruby's strftime format (http://www.ruby-doc.org/core-1.9.3/Time.html#method-i-strftime)
+date_format   : "%d %b %Y, %H:%M"
+
+# Load the given config file after all other config options have run
+# this may be used to override other configs, but is 
+# most use from the command line using the -c flag.
+#
+# Nil by default
+config_file   : 
