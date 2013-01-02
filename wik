@@ -845,16 +845,15 @@ def load_from_file(filename, opts)
   raise "Incorrect options format (YAML hash is needed!)" if not file_opts.is_a? Hash
 
   file_opts.each{|k, v|
-    eval("opts.#{k.to_s}=#{
-      case k.to_s
-        when 'css'
-          File.read(v)
-        when 'blacklist'
-          v.map{|x| Regexp.new(x) if not x.is_a? Regexp}
-        else
-          v
-      end
-    }")
+    v = case k.to_s
+      when 'css'
+        File.read(v)
+      when 'blacklist'
+        v.map{|x| Regexp.new(x) if not x.is_a? Regexp}
+      else
+        v
+    end
+    eval("opts.#{k.to_s}=v")
   }
 
   return opts
