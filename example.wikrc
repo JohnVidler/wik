@@ -52,7 +52,9 @@ extensions    :
 
 # Don't list these files in the directory listing.
 # This is an ARRAY of Regexes.
-blacklist     : []
+blacklist     : 
+  - '^\.git$'
+  - '^\.svn$'
 
 # Methods allowed to edit.  This is an array of:
 #   :form   --- Allow editing via a web form
@@ -76,6 +78,7 @@ header_info   :
   - :up
   - :counts
   - :words
+  - :direct
 
 # Enable the drop-down menu (contains file and dir links)
 menu          : true

@@ -345,6 +345,8 @@ HEAD_TEMPLATE = %q{
               case h
               when :counts %>
                 [<%=pages.length%>p, <%=files.length%>f, <%=dirs.length - (dirs.include?('..') ? 1 : 0)%>d]
+           <% when :direct %>
+                [<a href="?direct" title="direct download">&darr;</a>]
            <% when :words %>
                 [<%= File.exist?(path) ? File.read(path).split(/\w+/).count : '-' %>w]
            <% when :files %>
@@ -453,8 +455,9 @@ PAGE_TEMPLATE= HEAD_TEMPLATE + %{
 } + FOOT_TEMPLATE + %{
     <% if not readonly? %>
       <div id="hide_edit">
+        <a name="edit_box"/>
         <div id="prompt">Hover to show edit options.</div>
-        <div id="prompt_stick"><a href="javascript:{document.getElementById('prompt_stick').style.display = 'none'; document.getElementById('prompt').style.display = 'none'; document.getElementById('show_edit').style.display = 'block';};">Click to pin edit box.</a></div>
+        <div id="prompt_stick"><a name="edit_box" href="#edit_box" onclick="document.getElementById('prompt_stick').style.display = 'none'; document.getElementById('prompt').style.display = 'none'; document.getElementById('show_edit').style.display = 'block';">Click to pin edit box.</a></div>
         <div id="show_edit">
 } + EDIT_TEMPLATE + %{
         <% if @allow_upload %>
@@ -802,9 +805,9 @@ DEFAULT_OPTIONS.editpass      = ''
 DEFAULT_OPTIONS.cleandirs     = true 
 DEFAULT_OPTIONS.favicon       = FAVICON
 DEFAULT_OPTIONS.extensions    = %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text} 
-DEFAULT_OPTIONS.blacklist     = []
+DEFAULT_OPTIONS.blacklist     = [/^\.git$/, /^\.svn$/]
 DEFAULT_OPTIONS.editmethods   = [:form]
-DEFAULT_OPTIONS.header_info   = [:up, :counts, :words]
+DEFAULT_OPTIONS.header_info   = [:up, :counts, :words, :direct]
 DEFAULT_OPTIONS.menu          = true
 DEFAULT_OPTIONS.browser       = nil
 DEFAULT_OPTIONS.css           = CSS
@@ -847,7 +850,7 @@ def load_from_file(filename, opts)
   file_opts.each{|k, v|
     v = case k.to_s
       when 'css'
-        File.read(v)
+        File.exist?(v.to_s) ? File.read(v) : CSS
       when 'blacklist'
         v.map{|x| Regexp.new(x) if not x.is_a? Regexp}
       else
@@ -1089,7 +1092,11 @@ class SimpleWikEngine
     # Render file if found
     mime, content = nil, nil
     if File.exists?(path)
-      mime, content = render_file(path, msgs)
+      if req.query.keys.include?('direct') then
+        mime, content = render_direct(path)
+      else
+        mime, content = render_file(path, msgs)
+      end
     else
       mime, content = render_create(path, msgs)
     end
@@ -1103,6 +1110,18 @@ class SimpleWikEngine
     return "text/html; charset=UTF-8", compose_template(MISSING_TEMPLATE, File.basename(path), File.dirname(path), MIME::Types['text/plain'], path, '', msgs, :text) if not File.exist?(path) #and not @readonly 
   end
 
+  # Serves a file without any further processing
+  def render_direct(path, mime=nil)
+    # Find mime type if none given
+    if mime == nil
+      mime = MIME::Types.type_for(path)
+      mime = mime[0] || MIME::Types['text/plain'][0]
+    end
+
+    # then serve file
+    return mime, File.open(path, (mime.binary?) ? 'rb' : 'r' ).read
+  end
+
   def render_file(path, msgs=[])
     # render if markdown by extension or mime
     mime = MIME::Types.type_for(path)
@@ -1114,7 +1133,8 @@ class SimpleWikEngine
     
     # else simply output the content raw (for binary types, html, etc)
     mime = mime[0] || MIME::Types['text/plain'][0]
-    return mime, File.open(path, (mime.binary?) ? 'rb' : 'r' ).read
+    render_direct(path, mime)
+
   end
 
   def render_favicon()
