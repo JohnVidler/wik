@@ -345,11 +345,19 @@ HEAD_TEMPLATE = %q{
               case h
               when :counts %>
                 [<%=pages.length%>p, <%=files.length%>f, <%=dirs.length - (dirs.include?('..') ? 1 : 0)%>d]
-           <% when :direct %>
+           <% when :direct 
+                if File.exist?(path)
+           %>
                 [<a href="?direct" title="direct download">&darr;</a>]
-           <% when :words %>
-                [<%= File.exist?(path) ? File.read(path).split(/\w+/).count : '-' %>w]
-           <% when :files %>
+           <% 
+                end
+           when :words 
+                if File.exist?(path)
+           %>
+                [<%= File.read(path).split(/\w+/).count%>w]
+           <% 
+                end
+           when :files %>
                 [<%= files.delete_if{|f| not @extensions.include?(File.extname(f))}.map{|c|
                   c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}</a>"
                 }.join(", ") %>]
@@ -359,7 +367,7 @@ HEAD_TEMPLATE = %q{
                 }.join(", ") %>]
            <% when :up %> 
                 <% if File.absolute_path(basedir) != File.absolute_path(@basedir) %>
-                  [<a href="../">&larr;</a>]
+                  [<a title="Move up a directory" href="../">&larr;</a>]
                 <% end %>
            <% when :menu %> 
            <% end
@@ -807,7 +815,7 @@ DEFAULT_OPTIONS.favicon       = FAVICON
 DEFAULT_OPTIONS.extensions    = %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text} 
 DEFAULT_OPTIONS.blacklist     = [/^\.git$/, /^\.svn$/]
 DEFAULT_OPTIONS.editmethods   = [:form]
-DEFAULT_OPTIONS.header_info   = [:up, :counts, :words, :direct]
+DEFAULT_OPTIONS.header_info   = [:up, :direct, :counts, :words]
 DEFAULT_OPTIONS.menu          = true
 DEFAULT_OPTIONS.browser       = nil
 DEFAULT_OPTIONS.css           = CSS

@@ -40,7 +40,12 @@ Todo
 There's a few things that would be useful, but break the single-file philosophy too much.  They may be implemented one day (and if you do any, please send me a patch!):
 
 * SSL support---would make the password-to-edit feature more useful, but requires certificate specification and there's no easy way to roll them into the file:
-* Markdown highlighting in browser---Again, hard to inline without sending colossal, overwrought pages.  All Javascript and CSS gracefully degrades, so adding complexity may make that goal harder.
+* CGI mode support
+* Better ID selection for nav elements (less likely to collide with content)
+* Cleaner code for routing and wiki handling
+* Better conformance with HTML spec (especially menu drop-down)
+* Better support for 'generic' CSS
+
 
 Known Bugs
 ----------

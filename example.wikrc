@@ -76,9 +76,9 @@ editmethods   :
 # Items will appear in the order specified, right-left.
 header_info   : 
   - :up
+  - :direct
   - :counts
   - :words
-  - :direct
 
 # Enable the drop-down menu (contains file and dir links)
 menu          : true
