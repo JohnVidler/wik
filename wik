@@ -465,7 +465,7 @@ PAGE_TEMPLATE= HEAD_TEMPLATE + %{
       <div id="hide_edit">
         <a name="edit_box"/>
         <div id="prompt">Hover to show edit options.</div>
-        <div id="prompt_stick"><a name="edit_box" href="#edit_box" onclick="document.getElementById('prompt_stick').style.display = 'none'; document.getElementById('prompt').style.display = 'none'; document.getElementById('show_edit').style.display = 'block';">Click to pin edit box.</a></div>
+        <div id="prompt_stick"><a name="edit_box" href="#" onclick="javascript:{document.getElementById('prompt_stick').style.display = 'none'; document.getElementById('prompt').style.display = 'none'; document.getElementById('show_edit').style.display = 'block'; return false;}">Click to pin edit box.</a></div>
         <div id="show_edit">
 } + EDIT_TEMPLATE + %{
         <% if @allow_upload %>
@@ -822,6 +822,7 @@ DEFAULT_OPTIONS.css           = CSS
 DEFAULT_OPTIONS.allow_upload  = false
 DEFAULT_OPTIONS.date_format   = "%d %b %Y, %H:%M"
 DEFAULT_OPTIONS.config_file   = nil
+DEFAULT_OPTIONS.fix_line_end  = true
 
 # Parse command-line options.
 def parse(opts)
@@ -901,12 +902,12 @@ class Server < WEBrick::HTTPServlet::AbstractServlet
   private
 
   # build a response to the client from the given data
-  def build_response( response, status, cookies, content_type, body )
+  def build_response( response, status, cookies, content_type, body, cache=false)
     response.status           = status || 200
     cookies.each{ |k,v|         response.cookies << "#{k}=#{v}" }
     response['Content-Type']  = content_type || 'text/plain'
     response.body             = body || ''
-    response['Cache-control'] = "no-cache"
+    response['Cache-control'] = "no-cache" if not cache
 
     return response
   end
@@ -918,7 +919,7 @@ class SimpleWikEngine
   def initialize(path, o = {} )
     @basedir      = path
     @cleandirs    = o[:cleandirs]     || false
-    @editmethods  = o[:editmethods]   || [:extern, :from]
+    @editmethods  = o[:editmethods]   || [:extern, :form]
     @editpass     = o[:editpass]      || ''
     @default      = o[:default]       || "Index"
     @blacklist    = o[:blacklist]     || [/^\.\.?$/]
@@ -926,10 +927,11 @@ class SimpleWikEngine
     @extensions.map!{|x| ".#{x}"}
     @favicon      = o[:favicon]       || FAVICON
     @header_info  = o[:header_info]   || [:up, :counts, :words, :files, :dirs]
-    @menu         = o[:menu] 
+    @menu         = o[:menu]          == true
     @css          = o[:css]           || CSS
     @allow_upload = o[:allow_upload] 
     @date_format  = o[:date_format]   || "%d %b %Y, %H:%M"
+    @fix_line_end = o[:fix_line_end]  == true
   end
 
   # get request
@@ -939,8 +941,8 @@ class SimpleWikEngine
 
   # Post request, don't do anything special for now.
   def post(req)
-    return render(req, ["Wik is in read-only mode"]) if readonly?
-    return render(req, ["Form-based editing is disabled"]) if not @editmethods.include?(:form)
+    return render(req, ["Wik is in read-only mode"])        if readonly?
+    return render(req, ["Form-based editing is disabled"])  if not @editmethods.include?(:form)
 
     params = req.query
 
@@ -969,9 +971,15 @@ class SimpleWikEngine
     return render(req, ["Permission denied trying to write to #{path}"])  if not File.writable?(path)
     # here the file pointed to at path should be writable and present
 
+   
+    # Adjust line endings if requested
+    content = params['content']
+    content.gsub!(/\r\n?/, "\n") if @fix_line_end
+
+
     # write data
     fout = File.open(path, 'w')
-    fout.write(params['content'])
+    fout.write(content)
     fout.close
 
     # Check to see if the user wants the file deleting
@@ -1000,7 +1008,13 @@ class SimpleWikEngine
       dir_cleanup(File.join(@basedir, params['dir']))
     else
       ensure_path_exists(filename)
-      fout = File.open(filename, 'wb')
+
+      # Read content and see if it's binary
+      content = params['file']
+      binary  = MIME::Types.type_for(filename)[0].binary?
+      content.gsub!(/\r\n?/, "\n") if not binary and @fix_line_end
+
+      fout = File.open(filename, "w#{binary ? 'b' : ''}")
       fout.write(params['file'])
       fout.close
     end
@@ -1048,12 +1062,6 @@ class SimpleWikEngine
   def dir_empty?(dir)
     # thanks to http://www.ruby-forum.com/topic/84762
     !Dir.foreach(dir) {|n| break true unless /\A\.\.?\z/ =~ n}
-  end
-
-  # Add an error to the list, then call get
-  # Allows processing of requests half-way through
-  def nonfatal(req, msg)
-    return render(req, [msg])
   end
 
   # Return an error with a given code and message
@@ -1224,7 +1232,8 @@ Server.serve( opts.port, opts.interface, opts.path,
                                   :menu         => opts.menu,
                                   :css          => opts.css,
                                   :allow_upload => opts.allow_upload,
-                                  :date_format  => opts.date_format
+                                  :date_format  => opts.date_format,
+                                  :fix_line_end => opts.fix_line_end
                                   }
                                  ) 
             )

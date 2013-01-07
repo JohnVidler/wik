@@ -100,6 +100,11 @@ allow_upload  : false
 # This is ruby's strftime format (http://www.ruby-doc.org/core-1.9.3/Time.html#method-i-strftime)
 date_format   : "%d %b %Y, %H:%M"
 
+# Correct line endings to match unix format when input
+# is received.  Applies only to text mime types via upload
+# form, or to everything sent using the edit box.
+fix_line_end  : true
+
 # Load the given config file after all other config options have run
 # this may be used to override other configs, but is 
 # most use from the command line using the -c flag.
