@@ -162,6 +162,9 @@ CSS = %q{
         padding: 0.2em;
         margin: 0;
         background: white;
+        overflow-y: auto;
+        overflow-x: hidden;
+        max-height: 100%;
       }
 
       div#ddmenu:hover{
