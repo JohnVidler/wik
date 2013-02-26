@@ -21,7 +21,7 @@ DIR_TEMPLATE= %{
       <% pages.each{|c| 
         page_name = File.basename(c)[0..-(File.extname(c).length+1)]
         %>
-        <li><a href="<%=h c%>"/><%=h page_name%></a></li>
+        <li><a href="<%=u c%>"/><%=h page_name%></a></li>
       <%}%>
       </ul>
     <% end %>
@@ -30,7 +30,7 @@ DIR_TEMPLATE= %{
       <h2>Directories</h2>
       <ul>
       <% dirs.each{|c| %>
-        <li><a href="<%=h c%><%= File.directory?(File.join(basedir, c)) ? '/' : ''%>"/><%=h c%></a></li>
+        <li><a href="<%=u c%><%= File.directory?(File.join(basedir, c)) ? '/' : ''%>"/><%=h c%></a></li>
       <%}%>
       </ul>
     <% end %>
@@ -39,7 +39,7 @@ DIR_TEMPLATE= %{
       <h2>Files</h2>
       <ul>
       <% files.each{|c| %>
-        <li><a href="<%=h c%>"/><%=h c%></a></li>
+        <li><a href="<%=u c%>"/><%=h c%></a></li>
       <%}%>
       </ul>
     <% end %>
@@ -1191,6 +1191,12 @@ class SimpleWikEngine
     return ERB.new(template).result(binding)
   end
 
+  # URLencoding
+  def u(str)
+    return CGI::escape(str.to_s)
+  end
+
+  # HTML encoding
   def h(str)
     return CGI.escapeHTML(str.to_s)
   end
