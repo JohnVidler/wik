@@ -362,11 +362,11 @@ HEAD_TEMPLATE = %q{
                 end
            when :files %>
                 [<%= files.delete_if{|f| not @extensions.include?(File.extname(f))}.map{|c|
-                  c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}</a>"
+                  c = "<a href='#{u c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}</a>"
                 }.join(", ") %>]
            <% when :dirs %> 
                 [<%=dirs.map{|c|
-                  c = "<a href='#{c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}/</a>"
+                  c = "<a href='#{u c}#{File.directory?(File.join(basedir, c)) ? '/' : ''}'/>#{h c}/</a>"
                 }.join(", ") %>]
            <% when :up %> 
                 <% if File.absolute_path(basedir) != File.absolute_path(@basedir) %>
@@ -406,7 +406,7 @@ EDIT_TEMPLATE = %{
   <% if type == :text and not readonly? %>
     <div id="edit">
       <% if @editmethods.include?(:extern) %>
-        <div id="prompt_edit_extern"><a href="edit-file://<%=h File.absolute_path(path)%>">Click to edit in external application</a></div>
+        <div id="prompt_edit_extern"><a href="edit-file://<%=u File.absolute_path(path)%>">Click to edit in external application</a></div>
       <% end %>
 
       <% if @editmethods.include?(:form) %>
