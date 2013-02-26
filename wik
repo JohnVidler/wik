@@ -370,7 +370,7 @@ HEAD_TEMPLATE = %q{
                 }.join(", ") %>]
            <% when :up %> 
                 <% if File.absolute_path(basedir) != File.absolute_path(@basedir) %>
-                  [<a title="Move up a directory" href="../">&larr;</a>]
+                  [<a title="Move up a directory" href="../">&uarr;</a>]
                 <% end %>
            <% when :menu %> 
            <% end
@@ -806,6 +806,8 @@ AP/wP+J//wAA//C/43//AAD/8J/jv/8AAP/4z+Pf/wAA//jP49//AAD/+Ofj7/8AAP/4c+P3/wAA
 ////AAD///////8AAP///////wAA////////AAD///////8AAP///////wAA////////AAD/////
 //8AAP///////wAA////////AAD///////8AAA=="
 
+VERSION = "0.1.0"
+
 DEFAULT_OPTIONS               = OpenStruct.new
 DEFAULT_OPTIONS.daemonise     = false 
 DEFAULT_OPTIONS.interface     = "127.0.0.1"
@@ -847,6 +849,7 @@ def parse(opts)
     o.on('-B', '--browser CMD',         'Browser command to launch after starting (quits when browser process ends)'){|x| opts.browser = x }
     o.on('-c', '--config FILE',         'Read configuration from the given file'){|x| opts.config_file = x if File.exists?(x) }
   end
+  op.version = VERSION
   op.parse!
 
   return opts
