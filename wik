@@ -9,6 +9,7 @@ require 'markdown'      # text rendering
 require 'mime/types'    # serving of unknown files gem: mime-types
 require 'erb'           # template management
 require 'cgi'           # for escaping only
+require 'uri'           # for escaping only
 require 'fileutils'     # removing directories/files
 require 'pathname'      # for removing dirs
 require 'yaml'          # for config loading
@@ -1136,7 +1137,8 @@ class SimpleWikEngine
 
       # Read content and see if it's binary
       content = params['file']
-      binary  = MIME::Types.type_for(filename)[0].binary?
+      binary  = MIME::Types.type_for(filename)[0]
+      binary  = ((binary == nil) ? true : binary.binary?)  # ugly hack in case type_for returns nil...
       content.gsub!(/\r\n?/, "\n") if not binary and @fix_line_end
 
       fout = File.open(filename, "w#{binary ? 'b' : ''}")
@@ -1312,7 +1314,7 @@ class SimpleWikEngine
 
   # URLencoding
   def u(str)
-    return CGI::escape(str.to_s)
+    return URI::encode(str.to_s)
   end
 
   # HTML encoding
