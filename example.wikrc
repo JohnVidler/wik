@@ -83,6 +83,9 @@ header_info   :
 # Enable the drop-down menu (contains file and dir links)
 menu          : true
 
+# Enable the drop-down table of contents (built in javascript)
+toc           : true
+
 # Launch a browser command.  Wik will close after the 
 # process finishes.
 #

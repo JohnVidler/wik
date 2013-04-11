@@ -6,7 +6,7 @@ require 'optparse'      # command line options
 require 'logger'        # webrick
 require 'base64'        # favicon storage
 require 'markdown'      # text rendering
-require 'mime/types'    # serving of unknown files
+require 'mime/types'    # serving of unknown files gem: mime-types
 require 'erb'           # template management
 require 'cgi'           # for escaping only
 require 'fileutils'     # removing directories/files
@@ -122,7 +122,7 @@ CSS = %q{
         width: 100%;
       }
 
-      div#hide_edit div#show_edit, div#hide_edit:hover div#prompt, div#hide_edit div#prompt_stick, div#ddmenu_inner{
+      div#hide_edit div#show_edit, div#hide_edit:hover div#prompt, div#hide_edit div#prompt_stick, div#ddmenu_inner, div#ddtoc_inner{
         display: none;
       }
 
@@ -166,14 +166,39 @@ CSS = %q{
         overflow-x: hidden;
         max-height: 100%;
       }
+      
+      div#ddtoc{
+        display: block;
+        position: fixed;
+        top: -0;
+        right: -0;
+        padding: 0.2em;
+        margin: 0;
+        background: white;
+        overflow-y: auto;
+        overflow-x: hidden;
+        max-height: 100%;
+      }
 
-      div#ddmenu:hover{
+      div#ddtoc ol{
+        margin: 0.2em;
+        padding: 0.1em;
+        font-size: small;
+        line-height: 1em;
+      }
+      
+      div#ddtoc ol li{
+        margin: 0.1em;
+        padding: 0.1em;
+      }
+
+      div#ddmenu:hover, div#ddtoc:hover{
         border-right: solid 2px #777;
         border-bottom: solid 2px #777;
         box-shadow: 1px 1px 5px #aaa;
       }
 
-      div#ddmenu:hover span#prompt_menu{
+      div#ddmenu:hover span#prompt_menu, div#ddtoc:hover span#prompt_toc{
         display: none;
       }
 
@@ -202,7 +227,7 @@ CSS = %q{
         padding: 0 0.4em;
       }
       
-      div#hide_edit:hover div#show_edit, div#hide_edit:hover div#prompt_stick, div#hide_edit:hover div#upload, div#hide_edit:hover div#edit, div#ddmenu:hover div#ddmenu_inner, div#ddmenu_inner :hover{
+      div#hide_edit:hover div#show_edit, div#hide_edit:hover div#prompt_stick, div#hide_edit:hover div#upload, div#hide_edit:hover div#edit, div#ddmenu:hover div#ddmenu_inner, div#ddmenu_inner :hover, div#ddtoc:hover div#ddtoc_inner, div#ddtoc_inner:hover{
         display: block;
       }
 
@@ -297,6 +322,8 @@ CSS = %q{
       table { border-collapse: collapse; border-spacing: 0; }
       td { vertical-align: top; }
 
+      div#toc ol{ list-style-type: none; }
+
       @media only screen and (min-width: 480px) {
         body{font-size:14px;}
       }
@@ -306,6 +333,7 @@ CSS = %q{
       }
 
       @media print {
+        div#toc{ display: none; }
         * { background: transparent !important; color: black !important; filter:none !important; -ms-filter: none !important; }
         p{  text-align:justify; text-justify:inter-word; }
         body{font-size:10pt; max-width:100%;}
@@ -338,8 +366,90 @@ HEAD_TEMPLATE = %q{
       <%=@css%>
     </style>
 
+    <% if @toc %>
+    <script type="text/javascript" language="javascript">
+      /*
+       * Dynamic Table of Contents script
+       * by Steve Wattam <http://stephenwattam.com>,
+       * based on the algorithm by
+       * Matt Whitlock <http://www.whitsoftdev.com/>
+       */
+      function generateTOC(toc) {
+        // return if no toc listing thing.
+        if(toc == null) return;
+
+        // Min, max levels of heading to notice (inclusive)
+        var toclim  = [2,4],                // limits for TOC (NB: h1=0, h2=1, etc..)
+            headlim = [2,4],                // limits for headings
+
+        // Display options
+            heading_nums  = false,           // Display leading numbers in headings?
+            link_nums     = true,           // Display leading numbers in TOC?
+
+        // Counters
+            rx        = /^h([1-6])$/i,      // Regex for matching headers
+            levels    = [0, 0, 0, 0, 0, 0], // TOC depth counters
+            container = "ol",               // Type of container to use
+            hrefid    = "section";          // What to call links
+
+        // Correct for off-by-one error on the limits.
+        // This is totally unnecessary but makes config easier and only costs
+        // a few cycles (it's cheaper than modifying the code below).
+        toclim[0]--; toclim[1]--; headlim[0]--; headlim[1]--;
+
+        // Create the TOC container
+        toc = toc.appendChild(document.createElement(container));
+
+        // Loop over all heading
+        for (var i = 0; i < document.body.childNodes.length; ++i) {
+          var node = document.body.childNodes[i];
+
+          // If it's a heading...
+          if (m = node.nodeName.match(rx)){
+
+            // get level
+            lv = m[1] - 1;
+            levels[lv] ++;
+
+            // build section id for later use
+            var section = levels[toclim[0]];
+            for( j=toclim[0]+1; j<=lv; j++ ) section += "." + levels[j];
+
+            // If this is worthy of going in the TOC...
+            if(lv >= toclim[0] && lv <= toclim[1]) {
+
+              // Wipe lower items when recursing
+              for( j=lv+1; j<levels.length; j++) levels[j] = 0;
+
+              // Find the penultimate DOM item
+              var t = toc;
+              for( j=0; j<((lv - toclim[0]) * 2 - 1); j++) t = t.lastChild;
+
+              // Add a level of containers if necessary
+              if ( levels[lv] == 1 && lv > toclim[0] ) t.appendChild(document.createElement(container));
+
+              // Create the link node itself
+              var a = document.createElement("a");
+              a.setAttribute("href", "#" + hrefid + section);
+              a.innerHTML = (link_nums ? section + ". "  : "") + node.innerHTML;
+
+              // append link to TOC
+              if( lv - toclim[0] > 0 ) t = t.lastChild;
+              t.appendChild(document.createElement("li")).appendChild(a);
+            }
+
+            // Add numbering to headings if requested
+            if(heading_nums && lv >= headlim[0] && lv <= headlim[1]) node.insertBefore(document.createTextNode(section + ". "), node.firstChild);
+            node.id = hrefid + section;
+
+          }
+        }
+      }
+    </script>
+    <% end %>
+
   </head>
-  <body>
+  <body <% if @toc %>onload="generateTOC(document.getElementById('toc'));"<% end %>>
     <div id="banner">
       <div id="menu">
 
@@ -387,6 +497,12 @@ HEAD_TEMPLATE = %q{
             } + DIR_TEMPLATE + %q{
           </div>
         </div>
+      <% end %>
+
+      <% if @toc %>
+      <div id="ddtoc"><span id="prompt_toc">[toc]</span>
+        <div id="ddtoc_inner">
+          <div id="toc"></div></div></div>
       <% end %>
 
     <!-- error listing -->
@@ -822,6 +938,7 @@ DEFAULT_OPTIONS.blacklist     = [/^\.git$/, /^\.svn$/]
 DEFAULT_OPTIONS.editmethods   = [:form]
 DEFAULT_OPTIONS.header_info   = [:up, :direct, :counts, :words]
 DEFAULT_OPTIONS.menu          = true
+DEFAULT_OPTIONS.toc           = true
 DEFAULT_OPTIONS.browser       = nil
 DEFAULT_OPTIONS.css           = CSS
 DEFAULT_OPTIONS.allow_upload  = false
@@ -839,6 +956,7 @@ def parse(opts)
     o.on('-x', '--external-editing',    'Enable external edit links (disabled if interface is not \'127.0.0.1\')'){|x| opts.editmethods << :extern if opts.interface == '127.0.0.1' }
     o.on('-w', '--no-web-editing',      'Disable web edit box'){|x| opts.editmethods.delete(:form) }
     o.on('-m', '--no-menu',             'Disable menu'){|x| opts.menu = false }
+    o.on('-t', '--no-toc',              'Disable table-of-contents'){|x| opts.toc = false }
     o.on('-u', '--uploads',             'Allow file uploads'){|x| opts.allow_upload = true }
     o.on('-d', '--directory DIR',       'The directory in which to find content'){ |d| opts.path = d.to_s }
     o.on('-D', '--default INDEX',       'Index page name'){ |x| opts.default = x.to_s }
@@ -934,6 +1052,7 @@ class SimpleWikEngine
     @favicon      = o[:favicon]       || FAVICON
     @header_info  = o[:header_info]   || [:up, :counts, :words, :files, :dirs]
     @menu         = o[:menu]          == true
+    @toc          = o[:toc]           == true
     @css          = o[:css]           || CSS
     @allow_upload = o[:allow_upload] 
     @date_format  = o[:date_format]   || "%d %b %Y, %H:%M"
@@ -1242,6 +1361,7 @@ Server.serve( opts.port, opts.interface, opts.path,
                                   :favicon      => opts.favicon,
                                   :header_info  => opts.header_info,
                                   :menu         => opts.menu,
+                                  :toc          => opts.toc,
                                   :css          => opts.css,
                                   :allow_upload => opts.allow_upload,
                                   :date_format  => opts.date_format,
