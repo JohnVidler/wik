@@ -235,9 +235,10 @@ CSS = %q{
       /* ------------ Main content styling ---------------- */
       /* Taken from https://github.com/jasonm23/markdown-css-themes */
 
-      html { font-size: 100%; overflow-y: scroll; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+      html { font-size: 100%; overflow-y: scroll; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #eee; }
 
       body{
+		background-color: #fff;
         color:#444;
         font-family:Georgia, Palatino, 'Palatino Linotype', Times, 'Times New Roman', serif;
         font-size:12px;
