@@ -581,7 +581,7 @@ END_TEMPLATE = %{
 PAGE_TEMPLATE= HEAD_TEMPLATE + %{
     <%= content %>
 } + FOOT_TEMPLATE + %{
-    <% if not readonly? %>
+    <% unless readonly? %>
       <div id="hide_edit">
         <a name="edit_box"/>
         <div id="prompt">Hover to show edit options.</div>
@@ -598,7 +598,7 @@ PAGE_TEMPLATE= HEAD_TEMPLATE + %{
 } + END_TEMPLATE
 
 MISSING_TEMPLATE = HEAD_TEMPLATE + DIR_TEMPLATE + %{
-  <% if not readonly? %>
+  <% unless readonly? %>
     <hr/>
     <h2>Create Page: <%=h title%></h2>
 } + EDIT_TEMPLATE + %{
@@ -975,18 +975,18 @@ def parse(opts)
 end
 
 def load_from_file(filename, opts)
-  return opts if not File.exist?(filename) or not File.readable?(filename)
+  return opts unless File.exist?(filename) && File.readable?(filename)
 
   # Load and check format
   file_opts = YAML.load(File.read(filename))
-  raise "Incorrect options format (YAML hash is needed!)" if not file_opts.is_a? Hash
+  raise "Incorrect options format (YAML hash is needed!)" unless file_opts.is_a? Hash
 
   file_opts.each{|k, v|
     v = case k.to_s
       when 'css'
         File.exist?(v.to_s) ? File.read(v) : CSS
       when 'blacklist'
-        v.map{|x| Regexp.new(x) if not x.is_a? Regexp}
+        v.map{|x| Regexp.new(x) unless x.is_a? Regexp}
       else
         v
     end
@@ -1032,7 +1032,7 @@ class Server < WEBrick::HTTPServlet::AbstractServlet
     cookies.each{ |k,v|         response.cookies << "#{k}=#{v}" }
     response['Content-Type']  = content_type || 'text/plain'
     response.body             = body || ''
-    response['Cache-control'] = "no-cache" if not cache
+    response['Cache-control'] = "no-cache" unless cache
 
     return response
   end
@@ -1067,23 +1067,23 @@ class SimpleWikEngine
 
   # Post request, don't do anything special for now.
   def post(req)
-    return render(req, ["Wik is in read-only mode"])        if readonly?
-    return render(req, ["Form-based editing is disabled"])  if not @editmethods.include?(:form)
+    return render(req, "Wik is in read-only mode")        if readonly?
+    return render(req, "Form-based editing is disabled")  unless @editmethods.include?(:form)
 
     params = req.query
 
     # Handle any parameters
     # First check we have the correct password, if required
-    return render(req, ["No password supplied!"])             if @editpass.length > 0 and not params.keys.include?('pass')
-    return render(req, ["Wrong password!"])                   if @editpass.length > 0 and @editpass != params['pass'].to_s
+    return render(req, "No password supplied!")             if @editpass.length > 0 and not params.keys.include?('pass')
+    return render(req, "Wrong password!")                   if @editpass.length > 0 and @editpass != params['pass'].to_s
  
     # Check params and try doing stuff.  Prioritise editing.
-    return edit_page(req)   if not %w{content path}.map{|p| params.keys.include?(p) }.include?(false)
-    return upload_file(req) if not %w{file filename dir}.map{|p| params.keys.include?(p) }.include?(false) and @allow_upload
-    # return delete_file(req) if not %w{filename deleteconfirm}.map{|p| params.keys.include?(p) }.include?(false) and @allow_delete
+    return edit_page(req)   unless %w{content path}.map{|p| params.keys.include?(p) }.include?(false)
+    return upload_file(req) if !(%w{file filename dir}.map{|p| params.keys.include?(p) }.include?(false)) && @allow_upload
+    # return delete_file(req) unless %w{filename deleteconfirm}.map{|p| params.keys.include?(p) }.include?(false) and @allow_delete
   
-    # Error if nothing else returns
-    return render(req, ["Cannot do anything with those POST parameters."]) 
+    # Error unlesshing else returns
+    return render(req, "Cannot do anything with those POST parameters.") 
   end
 
   private
@@ -1093,8 +1093,8 @@ class SimpleWikEngine
     #Check path.  IF it doesn't exist, create it
     path = params['path'].to_s 
     ensure_path_exists(path)
-    return render(req, ["Cannot edit that path, as it is a directory!"])  if File.directory?(path)
-    return render(req, ["Permission denied trying to write to #{path}"])  if not File.writable?(path)
+    return render(req, "Cannot edit that path, as it is a directory!")  if File.directory?(path)
+    return render(req, "Permission denied trying to write to #{path}")  unless File.writable?(path)
     # here the file pointed to at path should be writable and present
 
    
@@ -1122,11 +1122,11 @@ class SimpleWikEngine
     filename = File.join(@basedir, params['dir'], params['filename'])
     
     # check permissions and file forms.
-    return render(req, ["Cannot write to that path, it\'s a directory!"]) if File.directory?(filename)
-    return render(req, ["Permission denied for #{filename}"])             if File.exist?(filename) and not File.writable?(filename)
+    return render(req, "Cannot write to that path, it\'s a directory!") if File.directory?(filename)
+    return render(req, "Permission denied for #{filename}")             if File.exist?(filename) and not File.writable?(filename)
 
     # Check if the user wants us to clobber things.
-    return render(req, ["File already exists, and I was not instructed to overwrite it."]) if File.exists?(filename) and not params['clobber'] == "yes"
+    return render(req, "File already exists, and I was not instructed to overwrite it.") if File.exists?(filename) and not params['clobber'] == "yes"
 
     # Remove file if no file contents given (requires clobber, checked above)
     if( File.exists?(filename) and params['file'].length == 0 )
@@ -1139,7 +1139,7 @@ class SimpleWikEngine
       content = params['file']
       binary  = MIME::Types.type_for(filename)[0]
       binary  = ((binary == nil) ? true : binary.binary?)  # ugly hack in case type_for returns nil...
-      content.gsub!(/\r\n?/, "\n") if not binary and @fix_line_end
+      content.gsub!(/\r\n?/, "\n") if !binary && @fix_line_end
 
       fout = File.open(filename, "w#{binary ? 'b' : ''}")
       fout.write(params['file'])
@@ -1157,7 +1157,7 @@ class SimpleWikEngine
   # Create directories like mkdir -p if they don't exist
   def ensure_path_exists(path)
     dirname     = dirname_from_path(path)
-    if not File.exist?(path) then
+    unless File.exist?(path) then
       # Work out the directory and mkdir -p it if it doesn't exist already
       FileUtils.mkdir_p( dirname )
 
@@ -1210,18 +1210,18 @@ class SimpleWikEngine
       return "#{path}#{e}" if File.exists?("#{path}#{e}") and not File.directory?("#{path}#{e}")
     }
 
-    # and, if not found, return default
-    path = "#{path}#{@extensions[0]}" if not @extensions.include?(File.extname(path))
+    # and, unless found, return default
+    path = "#{path}#{@extensions[0]}" unless @extensions.include?(File.extname(path))
 
     # return path
     return path
   end
 
-  def render(req, msgs=[])
+  def render(req, *msgs)
     # Render favicon
     # avoid the correct MIME 'type image/vnd.microsoft.icon' because it doesn't work in ie
     if req.path == '/favicon.ico'
-      code, mime, icon = render_favicon();
+      code, mime, icon = render_favicon()
       return code, mime, icon, {}
     end
 
@@ -1250,7 +1250,7 @@ class SimpleWikEngine
 
   def render_create(path, msgs=[])
     # Return blank edit page if no file exists
-    return "text/html; charset=UTF-8", compose_template(MISSING_TEMPLATE, File.basename(path), File.dirname(path), MIME::Types['text/plain'], path, '', msgs, :text) if not File.exist?(path) #and not @readonly 
+    return "text/html; charset=UTF-8", compose_template(MISSING_TEMPLATE, File.basename(path), File.dirname(path), MIME::Types['text/plain'], path, '', msgs, :text) unless File.exist?(path) #and not @readonly 
   end
 
   # Serves a file without any further processing
@@ -1281,7 +1281,7 @@ class SimpleWikEngine
   end
 
   def render_favicon()
-    return error("/favicon.ico", 404, 'No Favicon exists') if not @favicon
+    return error("/favicon.ico", 404, 'No Favicon exists') unless @favicon
     return 200, 'image/x-icon', Base64.decode64(@favicon)
   end
 
