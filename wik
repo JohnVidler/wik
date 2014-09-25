@@ -5,7 +5,7 @@ require 'ostruct'       # command line options
 require 'optparse'      # command line options
 require 'logger'        # webrick
 require 'base64'        # favicon storage
-require 'markdown'      # text rendering
+require 'github/markdown'      # text rendering
 require 'mime/types'    # serving of unknown files gem: mime-types
 require 'erb'           # template management
 require 'cgi'           # for escaping only
@@ -813,7 +813,7 @@ AP///wD///8A////AAAAAH0AAACg////AP///wD///8A////AP///wD///8A////AP///wD///8A
 AACiAAAA/wAAAP8AAADk////AP///wD///8AAAAACAAAANgAAADtAAAAGP///wD///8AAAAAKwAA
 AP8AAAD/AAAA/////wD///8A////AP///wD///8A////AAAAAAYAAADSAAAAWP///wD///8A////
 AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAC9AAAA/wAAAP8AAAD5
-AAAAPP///wD///8A////AP///wAAAAB4AAAA/wAAAP8AAAD/AAAAEf///wD///8A////AAAAADoA
+AAAAPP///wD///A////AP///wAAAAB4AAAA/wAAAP8AAAD/AAAAEf///wD///8A////AAAAADoA
 AAD+AAAAsgAAAAH///8AAAAAJAAAAP8AAAD/AAAA/wAAAAP///8A////AP///wD///8A////AP//
 /wAAAAA6AAAA6QAAABH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
 AP///wAAAADjAAAA/wAAAP8AAADlAAAACP///wD///8A////AP///wAAAABPAAAA/wAAAP8AAAD/
@@ -1270,7 +1270,7 @@ class SimpleWikEngine
     mime = MIME::Types.type_for(path)
     markdown_extension = @extensions.map{|e| File.extname(path).downcase == e }.include?(true)
     if markdown_extension or mime[0] == MIME::Types['text/plain'][0]
-      content = Markdown.new( File.read(path) ).to_html 
+      content = GitHub::Markdown.render_gfm( File.read(path) )
       return 'text/html; charset=UTF-8', compose_template( PAGE_TEMPLATE, File.basename(path), File.dirname(path), mime[0], path, content, msgs, :text )
     end
     
