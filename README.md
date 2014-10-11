@@ -1,3 +1,5 @@
+Forked from <http://stephenwattam.co.uk/projects/wik/> and subsequently edited. The original repo should be considered upstream.
+
 README
 ======
 
