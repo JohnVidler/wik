@@ -54,6 +54,7 @@ There's a few things that would be useful, but break the single-file philosophy 
 * Better conformance with HTML spec (especially menu drop-down)
 * Better support for 'generic' CSS
 * Fix server assumption of caching on send (change software model to fix this)
+* Add another edit field for commit messages when git integration is enabled - John
 
 
 Known Bugs
