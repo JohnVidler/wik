@@ -322,8 +322,12 @@ CSS = %q{
 
       img { border: 0; -ms-interpolation-mode: bicubic; vertical-align: middle; }
 
-      table { border-collapse: collapse; border-spacing: 0; }
-      td { vertical-align: top; }
+      table { border-collapse: collapse; border-spacing: 0; text-align: center; box-shadow: 0px 0px 5px #dfdfdf; }
+      td { padding: 0.3em; font-size: 0.8em; }
+      td p { text-align: left; }
+      thead tr { border-bottom: 3px solid #ddd; }
+      thead th { font-weight: bold; padding-left: 1em; padding-right: 1em; }
+      tbody tr { border-bottom: 2px solid #fff; background: #eee; }
 
       div#toc ol{ list-style-type: none; }
 
