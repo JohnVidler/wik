@@ -13,6 +13,7 @@ require 'uri'           # for escaping only
 require 'fileutils'     # removing directories/files
 require 'pathname'      # for removing dirs
 require 'yaml'          # for config loading
+require 'git'           # for automatic git integration
 
 
 DIR_TEMPLATE= %{
@@ -926,27 +927,28 @@ AP/wP+J//wAA//C/43//AAD/8J/jv/8AAP/4z+Pf/wAA//jP49//AAD/+Ofj7/8AAP/4c+P3/wAA
 
 VERSION = "0.1.1"
 
-DEFAULT_OPTIONS               = OpenStruct.new
-DEFAULT_OPTIONS.daemonise     = false 
-DEFAULT_OPTIONS.interface     = "127.0.0.1"
-DEFAULT_OPTIONS.port          = 8080
-DEFAULT_OPTIONS.path          = "./"
-DEFAULT_OPTIONS.default       = 'Index'
-DEFAULT_OPTIONS.editpass      = ''
-DEFAULT_OPTIONS.cleandirs     = true 
-DEFAULT_OPTIONS.favicon       = FAVICON
-DEFAULT_OPTIONS.extensions    = %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text txt} 
-DEFAULT_OPTIONS.blacklist     = [/^\.git$/, /^\.svn$/]
-DEFAULT_OPTIONS.editmethods   = [:form]
-DEFAULT_OPTIONS.header_info   = [:up, :direct, :counts, :words]
-DEFAULT_OPTIONS.menu          = true
-DEFAULT_OPTIONS.toc           = true
-DEFAULT_OPTIONS.browser       = nil
-DEFAULT_OPTIONS.css           = CSS
-DEFAULT_OPTIONS.allow_upload  = false
-DEFAULT_OPTIONS.date_format   = "%d %b %Y, %H:%M"
-DEFAULT_OPTIONS.config_file   = nil
-DEFAULT_OPTIONS.fix_line_end  = true
+DEFAULT_OPTIONS                  = OpenStruct.new
+DEFAULT_OPTIONS.daemonise        = false 
+DEFAULT_OPTIONS.interface        = "127.0.0.1"
+DEFAULT_OPTIONS.port             = 8080
+DEFAULT_OPTIONS.path             = "./"
+DEFAULT_OPTIONS.default          = 'Index'
+DEFAULT_OPTIONS.editpass         = ''
+DEFAULT_OPTIONS.cleandirs        = true 
+DEFAULT_OPTIONS.favicon          = FAVICON
+DEFAULT_OPTIONS.extensions       = %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text txt} 
+DEFAULT_OPTIONS.blacklist        = [/^\.git$/, /^\.svn$/]
+DEFAULT_OPTIONS.editmethods      = [:form]
+DEFAULT_OPTIONS.header_info      = [:up, :direct, :counts, :words]
+DEFAULT_OPTIONS.menu             = true
+DEFAULT_OPTIONS.toc              = true
+DEFAULT_OPTIONS.browser          = nil
+DEFAULT_OPTIONS.css              = CSS
+DEFAULT_OPTIONS.allow_upload     = false
+DEFAULT_OPTIONS.date_format      = "%d %b %Y, %H:%M"
+DEFAULT_OPTIONS.config_file      = nil
+DEFAULT_OPTIONS.fix_line_end     = true
+DEFAULT_OPTIONS.git_show_patch   = false
 
 # Parse command-line options.
 def parse(opts)
@@ -968,6 +970,7 @@ def parse(opts)
     o.on('-b', '--blacklist REGEX',     'Blacklist a certain regex from file listings (i.e. hidden files, RCS files)'){|x| opts.blacklist << Regexp.new(x) }
     o.on('-B', '--browser CMD',         'Browser command to launch after starting (quits when browser process ends)'){|x| opts.browser = x }
     o.on('-c', '--config FILE',         'Read configuration from the given file'){|x| opts.config_file = x if File.exists?(x) }
+    o.on(      '--git-patch',           'Display the git patch after each file change as a message in the browser'){|x| opts.git_show_patch = true }
   end
   op.version = VERSION
   op.parse!
@@ -1043,22 +1046,31 @@ end
 # Simple wik engine
 class SimpleWikEngine
   def initialize(path, o = {} )
-    @basedir      = path
-    @cleandirs    = o[:cleandirs]     || false
-    @editmethods  = o[:editmethods]   || [:extern, :form]
-    @editpass     = o[:editpass]      || ''
-    @default      = o[:default]       || "Index"
-    @blacklist    = o[:blacklist]     || [/^\.\.?$/]
-    @extensions   = o[:extensions]    || %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text}
+    @basedir          = path
+    @cleandirs        = o[:cleandirs]     || false
+    @editmethods      = o[:editmethods]   || [:extern, :form]
+    @editpass         = o[:editpass]      || ''
+    @default          = o[:default]       || "Index"
+    @blacklist        = o[:blacklist]     || [/^\.\.?$/]
+    @extensions       = o[:extensions]    || %w{markdown mdown mkdn md mkd mdwn mdtxt mdtext text}
     @extensions.map!{|x| ".#{x}"}
-    @favicon      = o[:favicon]       || FAVICON
-    @header_info  = o[:header_info]   || [:up, :counts, :words, :files, :dirs]
-    @menu         = o[:menu]          == true
-    @toc          = o[:toc]           == true
-    @css          = o[:css]           || CSS
-    @allow_upload = o[:allow_upload] 
-    @date_format  = o[:date_format]   || "%d %b %Y, %H:%M"
-    @fix_line_end = o[:fix_line_end]  == true
+    @favicon          = o[:favicon]       || FAVICON
+    @header_info      = o[:header_info]   || [:up, :counts, :words, :files, :dirs]
+    @menu             = o[:menu]          == true
+    @toc              = o[:toc]           == true
+    @css              = o[:css]           || CSS
+    @allow_upload     = o[:allow_upload] 
+    @date_format      = o[:date_format]   || "%d %b %Y, %H:%M"
+    @fix_line_end     = o[:fix_line_end]  == true
+	@git_show_patch   = o[:git_show_patch] || false
+
+	begin
+		puts( "Using git as a change storage mechanism." )
+		@git = Git.open(@basedir, :log => Logger.new(STDOUT))
+	rescue
+		puts( "Not operating inside a git repository, history will not be saved!" )
+		@git = false
+	end
   end
 
   # get request
@@ -1113,9 +1125,26 @@ class SimpleWikEngine
     if params['content'] == '' then
       File.delete(path)
       dir_cleanup(path) 
+      if @git then
+        puts( "Deleting file from git" )
+        @git.remove( path )
+        @git.commit( "Deleted #{path}" )
+      end
+    else
+      # Are we using git to save changes?
+      if @git then
+        puts( "Writing changes to git" )
+        @git.add( path )
+        @git.commit( "Changes to #{path}" )
+      end
     end
-  
-    render(req)
+ 
+	if (@git && @git_show_patch) then 
+      patch = @git.diff( "HEAD^", "HEAD" ).path(path).patch.split("\n")
+      render(req, *patch)
+	else
+      render(req)
+    end
   end
 
   def upload_file(req)
@@ -1133,6 +1162,12 @@ class SimpleWikEngine
     if( File.exists?(filename) and params['file'].length == 0 )
       File.delete(filename)
       dir_cleanup(File.join(@basedir, params['dir']))
+
+      if @git then
+        puts( "Deleting file from git" )
+        @git.remove( filename )
+        @git.commit( "Deleted #{filename}" )
+      end
     else
       ensure_path_exists(filename)
 
@@ -1145,9 +1180,21 @@ class SimpleWikEngine
       fout = File.open(filename, "w#{binary ? 'b' : ''}")
       fout.write(params['file'])
       fout.close
+
+      if @git then
+        puts( "Adding file to git" )
+        @git.add( filename )
+        @git.commit( "Uploaded #{filename}" )
+      end
+
     end
 
-    render(req)
+	if (@git && @git_show_patch) then 
+      patch = @git.diff( "HEAD^", "HEAD" ).path(path).patch.split("\n")
+      render(req, *patch)
+	else
+      render(req)
+    end
   end
 
   # Get dirname from path
@@ -1355,21 +1402,22 @@ end
 # Start the server serving, with various options from the opts opt
 Server.serve( opts.port, opts.interface, opts.path, 
              SimpleWikEngine.new(opts.path, 
-                                 {:cleandirs    => opts.cleandirs, 
-                                  :editmethods  => opts.editmethods,
-                                  :editpass     => opts.editpass, 
-                                  :default      => opts.default, 
-                                  :blacklist    => [/^\.\.?$/] + opts.blacklist, 
-                                  :extensions   => opts.extensions, 
-                                  :favicon      => opts.favicon,
-                                  :header_info  => opts.header_info,
-                                  :menu         => opts.menu,
-                                  :toc          => opts.toc,
-                                  :css          => opts.css,
-                                  :allow_upload => opts.allow_upload,
-                                  :date_format  => opts.date_format,
-                                  :fix_line_end => opts.fix_line_end
+                                 {:cleandirs      => opts.cleandirs, 
+                                  :editmethods    => opts.editmethods,
+                                  :editpass       => opts.editpass, 
+                                  :default        => opts.default, 
+                                  :blacklist      => [/^\.\.?$/] + opts.blacklist, 
+                                  :extensions     => opts.extensions, 
+                                  :favicon        => opts.favicon,
+                                  :header_info    => opts.header_info,
+                                  :menu           => opts.menu,
+                                  :toc            => opts.toc,
+                                  :css            => opts.css,
+                                  :allow_upload   => opts.allow_upload,
+                                  :date_format    => opts.date_format,
+                                  :fix_line_end   => opts.fix_line_end,
+                                  :git_show_patch => opts.git_show_patch
                                   }
                                  ) 
             )
-  
+
