@@ -7,7 +7,9 @@ It takes the form of a single-file web server and wiki, able to prettily present
 
 Note: if you're viewing this in Wik itself, [More information](sample-content/) is available in the sample content's homepage.
 
-**Now with automatic git commits - John**
+**Now with automatic git commits**
+
+To enable this feature (which commits each edit directly to the underlaying repository, use the -g or --git flag when running wik. -John.
 
 Requirements
 ------------
@@ -50,7 +52,6 @@ There's a few things that would be useful, but break the single-file philosophy 
 * Better conformance with HTML spec (especially menu drop-down)
 * Better support for 'generic' CSS
 * Fix server assumption of caching on send (change software model to fix this)
-* Add support for disabling git integration despite there being a backing repository - John
 
 
 Known Bugs
