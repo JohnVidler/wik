@@ -948,6 +948,8 @@ DEFAULT_OPTIONS.allow_upload     = false
 DEFAULT_OPTIONS.date_format      = "%d %b %Y, %H:%M"
 DEFAULT_OPTIONS.config_file      = nil
 DEFAULT_OPTIONS.fix_line_end     = true
+
+DEFAULT_OPTIONS.git_enabled      = false
 DEFAULT_OPTIONS.git_show_patch   = false
 
 # Parse command-line options.
@@ -970,6 +972,7 @@ def parse(opts)
     o.on('-b', '--blacklist REGEX',     'Blacklist a certain regex from file listings (i.e. hidden files, RCS files)'){|x| opts.blacklist << Regexp.new(x) }
     o.on('-B', '--browser CMD',         'Browser command to launch after starting (quits when browser process ends)'){|x| opts.browser = x }
     o.on('-c', '--config FILE',         'Read configuration from the given file'){|x| opts.config_file = x if File.exists?(x) }
+    o.on('-g', '--git',                 'Integrate with any git repository in the hosted directory, automatic change commits'){|x| opts.git_enabled = true }
     o.on(      '--git-patch',           'Display the git patch after each file change as a message in the browser'){|x| opts.git_show_patch = true }
   end
   op.version = VERSION
@@ -1062,14 +1065,18 @@ class SimpleWikEngine
     @allow_upload     = o[:allow_upload] 
     @date_format      = o[:date_format]   || "%d %b %Y, %H:%M"
     @fix_line_end     = o[:fix_line_end]  == true
+
+    @git_enabled      = o[:git_enabled] || false
 	@git_show_patch   = o[:git_show_patch] || false
 
-	begin
-		puts( "Using git as a change storage mechanism." )
-		@git = Git.open(@basedir, :log => Logger.new(STDOUT))
+    begin
+      if @git_enabled then
+        puts( "Using git as a change storage mechanism." )
+	    @git = Git.open(@basedir, :log => Logger.new(STDOUT))
+      end
 	rescue
-		puts( "Not operating inside a git repository, history will not be saved!" )
-		@git = false
+      puts( "Not operating inside a git repository, history will not be saved!" )
+      @git = false
 	end
   end
 
@@ -1416,6 +1423,7 @@ Server.serve( opts.port, opts.interface, opts.path,
                                   :allow_upload   => opts.allow_upload,
                                   :date_format    => opts.date_format,
                                   :fix_line_end   => opts.fix_line_end,
+                                  :git_enabled    => opts.git_enabled,
                                   :git_show_patch => opts.git_show_patch
                                   }
                                  ) 
