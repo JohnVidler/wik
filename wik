@@ -974,6 +974,8 @@ def parse(opts)
   return opts
 end
 
+# Load options from the file given, merging with the
+# opts passed in.
 def load_from_file(filename, opts)
   return opts if not File.exist?(filename) or not File.readable?(filename)
 
@@ -1088,6 +1090,7 @@ class SimpleWikEngine
 
   private
 
+  # Handle the edit form post data
   def edit_page(req)
     params = req.query
     #Check path.  IF it doesn't exist, create it
@@ -1109,7 +1112,7 @@ class SimpleWikEngine
     fout.close
 
     # Check to see if the user wants the file deleting
-    if params['content'] == '' then
+    if params['content'] == ''
       File.delete(path)
       dir_cleanup(path) 
     end
@@ -1117,6 +1120,7 @@ class SimpleWikEngine
     render(req)
   end
 
+  # Handle a file upload from the attached form
   def upload_file(req)
     params = req.query
     filename = File.join(@basedir, params['dir'], params['filename'])
@@ -1139,7 +1143,7 @@ class SimpleWikEngine
       content = params['file']
       binary  = MIME::Types.type_for(filename)[0]
       binary  = ((binary == nil) ? true : binary.binary?)  # ugly hack in case type_for returns nil...
-      content.gsub!(/\r\n?/, "\n") if not binary and @fix_line_end
+      content.gsub!(/\r\n?/, "\n") if !binary && @fix_line_end
 
       fout = File.open(filename, "w#{binary ? 'b' : ''}")
       fout.write(params['file'])
@@ -1157,7 +1161,7 @@ class SimpleWikEngine
   # Create directories like mkdir -p if they don't exist
   def ensure_path_exists(path)
     dirname     = dirname_from_path(path)
-    if not File.exist?(path) then
+    unless File.exist?(path)
       # Work out the directory and mkdir -p it if it doesn't exist already
       FileUtils.mkdir_p( dirname )
 
@@ -1170,14 +1174,14 @@ class SimpleWikEngine
   def dir_cleanup(path)
     dirname     = dirname_from_path(path)
     # Check if directory is empty and remove
-    if @cleandirs then
-      Pathname.new( dirname ).ascend(){ |d| 
+    if @cleandirs
+      Pathname.new( dirname ).ascend() do |d| 
         if dir_empty?(d)
           Dir.delete(d)
         else
           break
         end
-      }
+      end
     end
   end
 
@@ -1188,7 +1192,7 @@ class SimpleWikEngine
   # Test if a directory is empty (nothing but [., ..])
   def dir_empty?(dir)
     # thanks to http://www.ruby-forum.com/topic/84762
-    !Dir.foreach(dir) {|n| break true unless /\A\.\.?\z/ =~ n}
+    !Dir.foreach(dir) { |n| break true unless /\A\.\.?\z/ =~ n}
   end
 
   # Return an error with a given code and message
@@ -1196,27 +1200,30 @@ class SimpleWikEngine
     return code, "text/plain", "Error #{code}: #{msg}\r\nCurrent path: #{path}", {}
   end
 
+  # Work out what kind of file a path points at, or
+  # add the markdown extension for pages.
   def find_file(path)
     path = File.join(@basedir, path)
 
     # Return if the file exists
-    return path if File.exists?(path) and not File.directory?(path)
+    return path if File.exists?(path) && !File.directory?(path)
 
     # else add default
     path = "#{path}#{@default}"       if path.to_s[-1] == File::SEPARATOR
 
     # Check for all possible extensions and recurse if found
-    @extensions.each{ |e|
-      return "#{path}#{e}" if File.exists?("#{path}#{e}") and not File.directory?("#{path}#{e}")
-    }
+    @extensions.each do |e|
+      return "#{path}#{e}" if File.exists?("#{path}#{e}") && !File.directory?("#{path}#{e}")
+    end
 
     # and, if not found, return default
-    path = "#{path}#{@extensions[0]}" if not @extensions.include?(File.extname(path))
+    path = "#{path}#{@extensions[0]}" unless @extensions.include?(File.extname(path))
 
     # return path
     return path
   end
 
+  # Render the whole page, based on the path in the request object
   def render(req, msgs=[])
     # Render favicon
     # avoid the correct MIME 'type image/vnd.microsoft.icon' because it doesn't work in ie
@@ -1230,12 +1237,12 @@ class SimpleWikEngine
     path = find_file(req.path)
 
     # Check access to file or directory
-    return error(path, 403, "Could not access path, though it exists (permissions issue?).") if File.exist?(path) and not File.readable?(path)
+    return error(path, 403, "Could not access path, though it exists (permissions issue?).") if File.exist?(path) && !File.readable?(path)
 
     # Render file if found
     mime, content = nil, nil
     if File.exists?(path)
-      if req.query.keys.include?('direct') then
+      if req.query.keys.include?('direct')
         mime, content = render_direct(path)
       else
         mime, content = render_file(path, msgs)
@@ -1248,9 +1255,18 @@ class SimpleWikEngine
     return error(path, 404, "File not found!")
   end
 
+  # Render the 'create page' page
   def render_create(path, msgs=[])
     # Return blank edit page if no file exists
-    return "text/html; charset=UTF-8", compose_template(MISSING_TEMPLATE, File.basename(path), File.dirname(path), MIME::Types['text/plain'], path, '', msgs, :text) if not File.exist?(path) #and not @readonly 
+    return "text/html; charset=UTF-8", 
+           compose_template(MISSING_TEMPLATE, 
+                            File.basename(path), 
+                            File.dirname(path), 
+                            MIME::Types['text/plain'], 
+                            path, 
+                            '', 
+                            msgs, 
+                            :text) unless File.exist?(path) #and not @readonly 
   end
 
   # Serves a file without any further processing
@@ -1265,6 +1281,7 @@ class SimpleWikEngine
     return mime, File.open(path, (mime.binary?) ? 'rb' : 'r' ).read
   end
 
+  # Render any file.  Uses extension and mime type to estimate
   def render_file(path, msgs=[])
     # render if markdown by extension or mime
     mime = MIME::Types.type_for(path)
@@ -1280,18 +1297,20 @@ class SimpleWikEngine
 
   end
 
+  # Return the favicon from this file
   def render_favicon()
-    return error("/favicon.ico", 404, 'No Favicon exists') if not @favicon
+    return error("/favicon.ico", 404, 'No Favicon exists') unless @favicon
     return 200, 'image/x-icon', Base64.decode64(@favicon)
   end
 
+  # Render a template with headers and context
   def compose_template(template, title, pwd, mime, path, content, msgs=[], type=:text)
     # make local dir listing, with directories at the beginning
     dirs    = []
     pages   = []
     files   = []
     basedir = File.directory?(path) ? path : File.dirname(path)
-    Dir.foreach( basedir ){|d| 
+    Dir.foreach( basedir ) { |d| 
       if true != @blacklist.each{|b| break true if (d.to_s =~ b) }
         if File.directory?(File.join(basedir, d))
           dirs << d
@@ -1334,7 +1353,7 @@ opts = parse(opts)
 opts = load_from_file(opts.config_file, opts) if opts.config_file
 
 # Fork to the background if people request
-if opts.daemonise then
+if opts.daemonise
   puts "Forking to background..."
   Process.daemon(true) 
 end
@@ -1369,6 +1388,5 @@ Server.serve( opts.port, opts.interface, opts.path,
                                   :date_format  => opts.date_format,
                                   :fix_line_end => opts.fix_line_end
                                   }
-                                 ) 
-            )
+            ) )
   
