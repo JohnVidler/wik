@@ -1,19 +1,19 @@
 #!/usr/bin/env ruby
 
-require 'webrick'       # server
-require 'ostruct'       # command line options
-require 'optparse'      # command line options
-require 'logger'        # webrick
-require 'base64'        # favicon storage
-require 'markdown'      # text rendering
-require 'mime/types'    # serving of unknown files gem: mime-types
-require 'erb'           # template management
-require 'cgi'           # for escaping only
-require 'uri'           # for escaping only
-require 'fileutils'     # removing directories/files
-require 'pathname'      # for removing dirs
-require 'yaml'          # for config loading
-require 'git'           # for automatic git integration
+require 'webrick'         # server
+require 'ostruct'         # command line options
+require 'optparse'        # command line options
+require 'logger'          # webrick
+require 'base64'          # favicon storage
+require 'github/markdown' # text rendering
+require 'mime/types'      # serving of unknown files gem: mime-types
+require 'erb'             # template management
+require 'cgi'             # for escaping only
+require 'uri'             # for escaping only
+require 'fileutils'       # removing directories/files
+require 'pathname'        # for removing dirs
+require 'yaml'            # for config loading
+require 'git'             # for automatic git integration
 
 
 DIR_TEMPLATE= %{
@@ -819,7 +819,7 @@ AP///wD///8A////AAAAAH0AAACg////AP///wD///8A////AP///wD///8A////AP///wD///8A
 AACiAAAA/wAAAP8AAADk////AP///wD///8AAAAACAAAANgAAADtAAAAGP///wD///8AAAAAKwAA
 AP8AAAD/AAAA/////wD///8A////AP///wD///8A////AAAAAAYAAADSAAAAWP///wD///8A////
 AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wAAAAC9AAAA/wAAAP8AAAD5
-AAAAPP///wD///8A////AP///wAAAAB4AAAA/wAAAP8AAAD/AAAAEf///wD///8A////AAAAADoA
+AAAAPP///wD///A////AP///wAAAAB4AAAA/wAAAP8AAAD/AAAAEf///wD///8A////AAAAADoA
 AAD+AAAAsgAAAAH///8AAAAAJAAAAP8AAAD/AAAA/wAAAAP///8A////AP///wD///8A////AP//
 /wAAAAA6AAAA6QAAABH///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////
 AP///wAAAADjAAAA/wAAAP8AAADlAAAACP///wD///8A////AP///wAAAABPAAAA/wAAAP8AAAD/
@@ -985,6 +985,8 @@ def parse(opts)
   return opts
 end
 
+# Load options from the file given, merging with the
+# opts passed in.
 def load_from_file(filename, opts)
   return opts unless File.exist?(filename) && File.readable?(filename)
 
@@ -1112,6 +1114,7 @@ class SimpleWikEngine
 
   private
 
+  # Handle the edit form post data
   def edit_page(req)
     params = req.query
     #Check path.  IF it doesn't exist, create it
@@ -1133,7 +1136,7 @@ class SimpleWikEngine
     fout.close
 
     # Check to see if the user wants the file deleting
-    if params['content'] == '' then
+    if params['content'] == ''
       File.delete(path)
       dir_cleanup(path) 
       if @git then
@@ -1158,6 +1161,7 @@ class SimpleWikEngine
     end
   end
 
+  # Handle a file upload from the attached form
   def upload_file(req)
     params = req.query
     filename = File.join(@basedir, params['dir'], params['filename'])
@@ -1229,14 +1233,14 @@ class SimpleWikEngine
   def dir_cleanup(path)
     dirname     = dirname_from_path(path)
     # Check if directory is empty and remove
-    if @cleandirs then
-      Pathname.new( dirname ).ascend(){ |d| 
+    if @cleandirs
+      Pathname.new( dirname ).ascend() do |d| 
         if dir_empty?(d)
           Dir.delete(d)
         else
           break
         end
-      }
+      end
     end
   end
 
@@ -1247,7 +1251,7 @@ class SimpleWikEngine
   # Test if a directory is empty (nothing but [., ..])
   def dir_empty?(dir)
     # thanks to http://www.ruby-forum.com/topic/84762
-    !Dir.foreach(dir) {|n| break true unless /\A\.\.?\z/ =~ n}
+    !Dir.foreach(dir) { |n| break true unless /\A\.\.?\z/ =~ n}
   end
 
   # Return an error with a given code and message
@@ -1255,19 +1259,21 @@ class SimpleWikEngine
     return code, "text/plain", "Error #{code}: #{msg}\r\nCurrent path: #{path}", {}
   end
 
+  # Work out what kind of file a path points at, or
+  # add the markdown extension for pages.
   def find_file(path)
     path = File.join(@basedir, path)
 
     # Return if the file exists
-    return path if File.exists?(path) and not File.directory?(path)
+    return path if File.exists?(path) && !File.directory?(path)
 
     # else add default
     path = "#{path}#{@default}"       if path.to_s[-1] == File::SEPARATOR
 
     # Check for all possible extensions and recurse if found
-    @extensions.each{ |e|
-      return "#{path}#{e}" if File.exists?("#{path}#{e}") and not File.directory?("#{path}#{e}")
-    }
+    @extensions.each do |e|
+      return "#{path}#{e}" if File.exists?("#{path}#{e}") && !File.directory?("#{path}#{e}")
+    end
 
     # and, unless found, return default
     path = "#{path}#{@extensions[0]}" unless @extensions.include?(File.extname(path))
@@ -1289,12 +1295,12 @@ class SimpleWikEngine
     path = find_file(req.path)
 
     # Check access to file or directory
-    return error(path, 403, "Could not access path, though it exists (permissions issue?).") if File.exist?(path) and not File.readable?(path)
+    return error(path, 403, "Could not access path, though it exists (permissions issue?).") if File.exist?(path) && !File.readable?(path)
 
     # Render file if found
     mime, content = nil, nil
     if File.exists?(path)
-      if req.query.keys.include?('direct') then
+      if req.query.keys.include?('direct')
         mime, content = render_direct(path)
       else
         mime, content = render_file(path, msgs)
@@ -1307,6 +1313,7 @@ class SimpleWikEngine
     return error(path, 404, "File not found!")
   end
 
+  # Render the 'create page' page
   def render_create(path, msgs=[])
     # Return blank edit page if no file exists
     return "text/html; charset=UTF-8", compose_template(MISSING_TEMPLATE, File.basename(path), File.dirname(path), MIME::Types['text/plain'], path, '', msgs, :text) unless File.exist?(path) #and not @readonly 
@@ -1324,12 +1331,13 @@ class SimpleWikEngine
     return mime, File.open(path, (mime.binary?) ? 'rb' : 'r' ).read
   end
 
+  # Render any file.  Uses extension and mime type to estimate
   def render_file(path, msgs=[])
     # render if markdown by extension or mime
     mime = MIME::Types.type_for(path)
     markdown_extension = @extensions.map{|e| File.extname(path).downcase == e }.include?(true)
     if markdown_extension or mime[0] == MIME::Types['text/plain'][0]
-      content = Markdown.new( File.read(path) ).to_html 
+      content = GitHub::Markdown.render_gfm( File.read(path) )
       return 'text/html; charset=UTF-8', compose_template( PAGE_TEMPLATE, File.basename(path), File.dirname(path), mime[0], path, content, msgs, :text )
     end
     
@@ -1339,18 +1347,20 @@ class SimpleWikEngine
 
   end
 
+  # Return the favicon from this file
   def render_favicon()
     return error("/favicon.ico", 404, 'No Favicon exists') unless @favicon
     return 200, 'image/x-icon', Base64.decode64(@favicon)
   end
 
+  # Render a template with headers and context
   def compose_template(template, title, pwd, mime, path, content, msgs=[], type=:text)
     # make local dir listing, with directories at the beginning
     dirs    = []
     pages   = []
     files   = []
     basedir = File.directory?(path) ? path : File.dirname(path)
-    Dir.foreach( basedir ){|d| 
+    Dir.foreach( basedir ) { |d| 
       if true != @blacklist.each{|b| break true if (d.to_s =~ b) }
         if File.directory?(File.join(basedir, d))
           dirs << d
@@ -1393,7 +1403,7 @@ opts = parse(opts)
 opts = load_from_file(opts.config_file, opts) if opts.config_file
 
 # Fork to the background if people request
-if opts.daemonise then
+if opts.daemonise
   puts "Forking to background..."
   Process.daemon(true) 
 end
