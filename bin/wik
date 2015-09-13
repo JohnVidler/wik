@@ -13,7 +13,7 @@ require 'uri'             # for escaping only
 require 'fileutils'       # removing directories/files
 require 'pathname'        # for removing dirs
 require 'yaml'            # for config loading
-require 'git'             # for automatic git integration
+require 'git'             # for automatic git integration (John)
 
 
 DIR_TEMPLATE= %{
@@ -319,6 +319,43 @@ CSS = %q{
       ul, ol { margin: 1em 0; padding: 0 0 0 2em; }
       li p:last-child { margin:0 }
       dd { margin: 0 0 0 2em; }
+
+      ul.tree, ul.tree ul {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 12px;
+      }
+
+      ul.tree ul {
+        margin-left: 12px;
+        border-left: 2px solid #000;
+        margin-top: -12px;
+        padding-top: 12px;
+      }
+
+      ul.tree li {
+        margin: 0;
+        padding-left: 12px;
+        line-height: 14px;
+      }
+
+      ul.tree li:before {
+        content: " ";
+        position: relative;
+        bottom: 8px;
+        padding-right: 12px;
+        margin-right: 10px;
+	width: 10px;
+        border-bottom: 2px solid #000;
+        border-left: 2px solid #000;
+      }
+
+      ul.tree *:last-child {
+        border-left: none;
+      }
+
 
       img { border: 0; -ms-interpolation-mode: bicubic; vertical-align: middle; }
 
@@ -1288,6 +1325,38 @@ class SimpleWikEngine
     if req.path == '/favicon.ico'
       code, mime, icon = render_favicon()
       return code, mime, icon, {}
+    end
+
+    if req.path == '/.tree'
+      buffer = "<!DOCTYPE html><html><head><title>Web Tree</title><style>" << CSS << "</style></head><body>"
+
+      buffer << "<ul class='tree'>"
+      buffer << "<a href='/'>Home</a><br />"
+      depth = 0
+      Dir.glob('**/*') do |path|
+        ndepth = path.count('/')
+
+        while ndepth > depth do
+          buffer << "<ul>"
+          depth += 1
+        end
+        while ndepth < depth do
+          buffer << "</ul>"
+          depth -= 1
+        end
+       
+        if not path.end_with? "Index.markdown"
+          if File.exist?( path + "/Index.markdown" )
+            buffer << "<li><a href='" << path << "/Index.markdown'>" << path << "</a></li>"
+          else
+            buffer << "<li><a href='" << path << "'>" << path << "</a></li>"
+          end
+        end
+      end
+      buffer << "</ul>"
+
+      buffer << "</body></html>"
+      return 200, 'text/html', buffer, {}
     end
 
 
