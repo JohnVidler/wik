@@ -2,7 +2,7 @@
 Gem::Specification.new do |s|
   # About the gem
   s.name        = 'wik'
-  s.version     = '0.1.0b'
+  s.version     = '0.1.0c'
   s.date        = '2014-10-17'
   s.summary     = 'A single-file wiki using markdown'
   s.description = 'An interface for viewing and editing ad-hoc markdown notes'
